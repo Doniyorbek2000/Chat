@@ -1,0 +1,283 @@
+version: '3.9'
+
+services:
+  # ==================== BACKEND ====================
+  voxo-backend:
+    image: ghcr.io/voxo-app/voxo-backend:${IMAGE_TAG:-latest}
+    container_name: voxo-backend
+    restart: always
+    expose:
+      - '3000'
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      APP_NAME: VOXO
+      DATABASE_URL: postgresql://voxo:${POSTGRES_PASSWORD}@postgres:5432/voxo
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 30d
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: voxo
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      S3_REGION: us-east-1
+      S3_PUBLIC_URL: https://cdn.voxo.app/voxo
+      CORS_ORIGIN: https://admin.voxo.app,voxo://app
+      THROTTLE_TTL: 60000
+      THROTTLE_LIMIT: 100
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      APPLE_CLIENT_ID: ${APPLE_CLIENT_ID}
+      APPLE_TEAM_ID: ${APPLE_TEAM_ID}
+      APPLE_KEY_ID: ${APPLE_KEY_ID}
+      APPLE_PRIVATE_KEY: ${APPLE_PRIVATE_KEY}
+      ZEGOCLOUD_APP_ID: ${ZEGOCLOUD_APP_ID}
+      ZEGOCLOUD_SERVER_SECRET: ${ZEGOCLOUD_SERVER_SECRET}
+      CLICK_MERCHANT_ID: ${CLICK_MERCHANT_ID}
+      CLICK_SERVICE_ID: ${CLICK_SERVICE_ID}
+      CLICK_SECRET_KEY: ${CLICK_SECRET_KEY}
+      PAYME_MERCHANT_ID: ${PAYME_MERCHANT_ID}
+      PAYME_KEY: ${PAYME_KEY}
+      UZUM_MERCHANT_ID: ${UZUM_MERCHANT_ID}
+      UZUM_SECRET_KEY: ${UZUM_SECRET_KEY}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID}
+      FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY}
+      FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - voxo-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:3000/health']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: '50m'
+        max-file: '5'
+
+  # ==================== ADMIN ====================
+  voxo-admin:
+    image: ghcr.io/voxo-app/voxo-admin:${IMAGE_TAG:-latest}
+    container_name: voxo-admin
+    restart: always
+    expose:
+      - '3001'
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: https://api.voxo.app
+      NEXTAUTH_URL: https://admin.voxo.app
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+    depends_on:
+      voxo-backend:
+        condition: service_healthy
+    networks:
+      - voxo-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:3001']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: '50m'
+        max-file: '5'
+
+  # ==================== POSTGRES ====================
+  postgres:
+    image: postgres:16-alpine
+    container_name: voxo-postgres
+    restart: always
+    expose:
+      - '5432'
+    environment:
+      POSTGRES_DB: voxo
+      POSTGRES_USER: voxo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - voxo-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U voxo -d voxo']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: '50m'
+        max-file: '5'
+
+  # ==================== REDIS ====================
+  redis:
+    image: redis:7-alpine
+    container_name: voxo-redis
+    restart: always
+    expose:
+      - '6379'
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --appendonly yes
+      --appendfsync everysec
+    volumes:
+      - redis_data:/data
+    networks:
+      - voxo-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 768M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD}', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: '50m'
+        max-file: '5'
+
+  # ==================== MINIO ====================
+  minio:
+    image: minio/minio:latest
+    container_name: voxo-minio
+    restart: always
+    expose:
+      - '9000'
+      - '9001'
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BROWSER: 'on'
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - voxo-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: '50m'
+        max-file: '5'
+
+  # ==================== NGINX ====================
+  nginx:
+    image: nginx:alpine
+    container_name: voxo-nginx
+    restart: always
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - voxo-backend
+      - voxo-admin
+    networks:
+      - voxo-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: '50m'
+        max-file: '5'
+
+# ==================== NETWORKS ====================
+networks:
+  voxo-network:
+    driver: bridge
+    name: voxo-network-prod
+
+# ==================== VOLUMES ====================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+  nginx_logs:
+    driver: local

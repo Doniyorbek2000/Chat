@@ -1,0 +1,219 @@
+version: '3.9'
+
+services:
+  # ==================== BACKEND ====================
+  voxo-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: runner
+    container_name: voxo-backend
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      APP_NAME: VOXO
+      DATABASE_URL: postgresql://voxo:voxo_secure_password@postgres:5432/voxo
+      REDIS_URL: redis://:redis_password@redis:6379
+      JWT_SECRET: dev-jwt-secret-key-min-32-chars-long
+      JWT_REFRESH_SECRET: dev-jwt-refresh-secret-key-min-32-chars
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 30d
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: voxo
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin_secret
+      S3_REGION: us-east-1
+      S3_PUBLIC_URL: http://localhost:9000/voxo
+      CORS_ORIGIN: http://localhost:3001,http://localhost:80
+      THROTTLE_TTL: 60000
+      THROTTLE_LIMIT: 100
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - voxo-network
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:3000/health']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    volumes:
+      - ./backend/src:/app/src:delegated
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  # ==================== ADMIN ====================
+  voxo-admin:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile
+      target: runner
+    container_name: voxo-admin
+    restart: unless-stopped
+    ports:
+      - '3001:3001'
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: http://localhost:3000
+      NEXTAUTH_URL: http://localhost:3001
+      NEXTAUTH_SECRET: dev-nextauth-secret-key-min-32-chars
+    depends_on:
+      voxo-backend:
+        condition: service_healthy
+    networks:
+      - voxo-network
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:3001']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  # ==================== POSTGRES ====================
+  postgres:
+    image: postgres:16-alpine
+    container_name: voxo-postgres
+    restart: unless-stopped
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_DB: voxo
+      POSTGRES_USER: voxo
+      POSTGRES_PASSWORD: voxo_secure_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - voxo-network
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U voxo -d voxo']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  # ==================== REDIS ====================
+  redis:
+    image: redis:7-alpine
+    container_name: voxo-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    command: >
+      redis-server
+      --requirepass redis_password
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+    volumes:
+      - redis_data:/data
+    networks:
+      - voxo-network
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', 'redis_password', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  # ==================== MINIO ====================
+  minio:
+    image: minio/minio:latest
+    container_name: voxo-minio
+    restart: unless-stopped
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin_secret
+      MINIO_DEFAULT_BUCKETS: voxo
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - voxo-network
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  # ==================== NGINX ====================
+  nginx:
+    image: nginx:alpine
+    container_name: voxo-nginx
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - voxo-backend
+      - voxo-admin
+    networks:
+      - voxo-network
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+# ==================== NETWORKS ====================
+networks:
+  voxo-network:
+    driver: bridge
+    name: voxo-network
+
+# ==================== VOLUMES ====================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+  nginx_logs:
+    driver: local

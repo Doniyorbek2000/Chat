@@ -1,0 +1,294 @@
+name: Mobile CI/CD
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/mobile-ci.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'mobile/**'
+
+env:
+  FLUTTER_VERSION: '3.19.0'
+  JAVA_VERSION: '17'
+
+jobs:
+  # ==================== FLUTTER TESTS ====================
+  flutter-test:
+    name: Flutter Tests & Analysis
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./mobile
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      - name: Run code generation
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Verify formatting
+        run: dart format --output none --set-exit-if-changed .
+
+      - name: Analyze code
+        run: flutter analyze --fatal-infos
+
+      - name: Run tests
+        run: flutter test --coverage --reporter=expanded
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: flutter-coverage
+          path: mobile/coverage/
+          retention-days: 7
+
+  # ==================== BUILD ANDROID ====================
+  build-android:
+    name: Build Android
+    runs-on: ubuntu-latest
+    needs: flutter-test
+    if: github.event_name == 'push'
+    defaults:
+      run:
+        working-directory: ./mobile
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: gradle
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      - name: Run code generation
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Decode Android keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/keystore.jks
+          echo "storeFile=keystore.jks" > android/key.properties
+          echo "storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}" >> android/key.properties
+          echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" >> android/key.properties
+          echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}" >> android/key.properties
+
+      - name: Configure app environment
+        run: |
+          cat > lib/core/constants/env_config.dart << 'EOF'
+          class EnvConfig {
+            static const String apiBaseUrl = '${{ github.ref == 'refs/heads/main' && 'https://api.voxo.app' || 'https://api-staging.voxo.app' }}';
+            static const String environment = '${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}';
+          }
+          EOF
+
+      - name: Build APK (Debug)
+        if: github.ref != 'refs/heads/main'
+        run: flutter build apk --debug --build-number=${{ github.run_number }}
+
+      - name: Build APK (Release)
+        if: github.ref == 'refs/heads/main'
+        run: flutter build apk --release --build-number=${{ github.run_number }}
+
+      - name: Build App Bundle (AAB)
+        if: github.ref == 'refs/heads/main'
+        run: flutter build appbundle --release --build-number=${{ github.run_number }}
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: voxo-android-apk-${{ github.run_number }}
+          path: |
+            mobile/build/app/outputs/flutter-apk/*.apk
+          retention-days: 14
+
+      - name: Upload AAB artifact
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: voxo-android-aab-${{ github.run_number }}
+          path: mobile/build/app/outputs/bundle/release/*.aab
+          retention-days: 30
+
+      - name: Upload to Play Store (Internal Testing)
+        if: github.ref == 'refs/heads/main'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: app.voxo.mobile
+          releaseFiles: mobile/build/app/outputs/bundle/release/*.aab
+          track: internal
+          status: completed
+          inAppUpdatePriority: 2
+
+  # ==================== BUILD IOS ====================
+  build-ios:
+    name: Build iOS
+    runs-on: macos-latest
+    needs: flutter-test
+    if: github.event_name == 'push'
+    defaults:
+      run:
+        working-directory: ./mobile
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      - name: Run code generation
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Import Apple certificates
+        uses: apple-actions/import-codesign-certs@v2
+        with:
+          p12-file-base64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          p12-password: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+
+      - name: Download provisioning profile
+        uses: apple-actions/download-provisioning-profiles@v1
+        with:
+          bundle-id: app.voxo.mobile
+          issuer-id: ${{ secrets.APPSTORE_CONNECT_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_CONNECT_API_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_CONNECT_API_PRIVATE_KEY }}
+
+      - name: Configure app environment
+        run: |
+          cat > lib/core/constants/env_config.dart << 'EOF'
+          class EnvConfig {
+            static const String apiBaseUrl = '${{ github.ref == 'refs/heads/main' && 'https://api.voxo.app' || 'https://api-staging.voxo.app' }}';
+            static const String environment = '${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}';
+          }
+          EOF
+
+      - name: Build iOS (Release)
+        run: |
+          flutter build ios --release --no-codesign --build-number=${{ github.run_number }}
+
+      - name: Archive and export IPA
+        run: |
+          cd ios
+          xcodebuild -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -archivePath $RUNNER_TEMP/Runner.xcarchive \
+            archive \
+            CODE_SIGN_STYLE=Manual \
+            PROVISIONING_PROFILE_SPECIFIER="VOXO Distribution"
+
+          xcodebuild -exportArchive \
+            -archivePath $RUNNER_TEMP/Runner.xcarchive \
+            -exportPath $RUNNER_TEMP/build \
+            -exportOptionsPlist ExportOptions.plist
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: voxo-ios-ipa-${{ github.run_number }}
+          path: ${{ runner.temp }}/build/*.ipa
+          retention-days: 14
+
+      - name: Upload to TestFlight
+        if: github.ref == 'refs/heads/main'
+        uses: apple-actions/upload-testflight-build@v1
+        with:
+          app-path: ${{ runner.temp }}/build/VOXO.ipa
+          issuer-id: ${{ secrets.APPSTORE_CONNECT_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_CONNECT_API_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_CONNECT_API_PRIVATE_KEY }}
+
+  # ==================== CREATE RELEASE ====================
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-android, build-ios]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get version from pubspec
+        id: get_version
+        run: |
+          VERSION=$(grep "^version:" mobile/pubspec.yaml | sed 's/version: //')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download Android APK
+        uses: actions/download-artifact@v4
+        with:
+          name: voxo-android-apk-${{ github.run_number }}
+          path: artifacts/android
+
+      - name: Download Android AAB
+        uses: actions/download-artifact@v4
+        with:
+          name: voxo-android-aab-${{ github.run_number }}
+          path: artifacts/android
+
+      - name: Download iOS IPA
+        uses: actions/download-artifact@v4
+        with:
+          name: voxo-ios-ipa-${{ github.run_number }}
+          path: artifacts/ios
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.get_version.outputs.version }}-${{ github.run_number }}
+          name: VOXO v${{ steps.get_version.outputs.version }} (Build ${{ github.run_number }})
+          body: |
+            ## Changes in this release
+            ${{ github.event.head_commit.message }}
+
+            **Commit:** ${{ github.sha }}
+            **Build:** ${{ github.run_number }}
+          files: |
+            artifacts/android/*.apk
+            artifacts/android/*.aab
+            artifacts/ios/*.ipa
+          draft: false
+          prerelease: false
