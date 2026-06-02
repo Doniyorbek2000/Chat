@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -27,6 +28,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final List<Map<String, dynamic>> _messages = [];
   bool _loading = true;
   bool _sending = false;
+  StreamSubscription<Map<String, dynamic>>? _msgSub;
 
   @override
   void initState() {
@@ -37,6 +39,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   void dispose() {
+    _msgSub?.cancel();
     _controller.dispose();
     _scrollCtrl.dispose();
     super.dispose();
@@ -60,15 +63,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _listenSocket() {
-    final socket = ref.read(socketClientProvider);
-    socket.on('chat:message', (data) {
+    _msgSub = SocketClient.instance.onPrivateMessage.listen((msg) {
       if (!mounted) return;
-      final msg = data as Map<String, dynamic>;
       if (msg['senderId'] == widget.userId || msg['receiverId'] == widget.userId) {
         setState(() => _messages.add(msg));
         _scrollToBottom();
       }
     });
+    SocketClient.instance.subscribeToUser(widget.userId);
   }
 
   void _scrollToBottom() {
@@ -89,12 +91,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     setState(() => _sending = true);
     _controller.clear();
     try {
-      final socket = ref.read(socketClientProvider);
-      socket.emit('chat:send', {
-        'receiverId': widget.userId,
-        'content': text,
-        'type': 'TEXT',
-      });
+      SocketClient.instance.sendPrivateMessage(
+        toUserId: widget.userId,
+        content: text,
+      );
       setState(() {
         _messages.add({
           'content': text,
