@@ -133,7 +133,7 @@ export default function Sidebar({ pendingReports = 0, pendingWithdrawals = 0 }: 
   const { data: session } = useSession()
   const [collapsed, setCollapsed] = useState(false)
 
-  const userRole = session?.user?.role || 'support'
+  const userRole = (session?.user as any)?.role || 'support'
 
   const enrichedNavItems = navItems.map((item) => {
     if (item.href === '/reports') return { ...item, badge: pendingReports }

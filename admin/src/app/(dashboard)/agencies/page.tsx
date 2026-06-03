@@ -122,7 +122,7 @@ export default function AgenciesPage() {
       header: 'Owner',
       size: 160,
       cell: (info) => {
-        const owner = info.getValue()
+        const owner = info.getValue() as (typeof info.row.original)['owner']
         return (
           <div className="flex items-center gap-2">
             <Avatar src={owner?.avatar} name={owner?.displayName || 'Owner'} size="xs" online={owner?.isOnline} />

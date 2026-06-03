@@ -29,7 +29,7 @@ const mockRoom: Room = {
   tags: ['music', 'chill', 'pop'],
 }
 
-const mockMembers: (RoomMember & { user: { displayName: string; username: string; uid: string; vipLevel: number } })[] = Array.from({ length: 10 }, (_, i) => ({
+const mockMembers = Array.from({ length: 10 }, (_, i) => ({
   id: `member-${i}`,
   roomId: 'room-1',
   userId: `user-${i}`,
@@ -40,7 +40,7 @@ const mockMembers: (RoomMember & { user: { displayName: string; username: string
   totalGiftsSent: Math.floor(Math.random() * 5000),
 }))
 
-const mockGifts: (GiftTransaction & { gift: { name: string }; sender: { displayName: string }; receiver: { displayName: string } })[] = Array.from({ length: 15 }, (_, i) => ({
+const mockGifts = Array.from({ length: 15 }, (_, i) => ({
   id: `gift-${i}`,
   giftId: `gift-${i % 5}`,
   gift: { name: ['Rose', 'Crown', 'Rocket', 'Diamond Ring', 'Super Car'][i % 5] },

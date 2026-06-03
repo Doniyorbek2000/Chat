@@ -29,7 +29,11 @@ export class EventsController {
   }
 
   @Get(':id/leaderboard')
-  getEventLeaderboard(@Param('id') id: string, @Query('page') page = 1, @Query('limit') limit = 50) {
+  getEventLeaderboard(
+    @Param('id') id: string,
+    @Query('page') page = 1,
+    @Query('limit') limit = 50,
+  ) {
     return this.eventsService.getEventLeaderboard(id, +page, +limit);
   }
 

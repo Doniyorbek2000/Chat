@@ -5,10 +5,7 @@ import { NotificationsService } from './notifications.service';
 import { PrismaModule } from '../../prisma/prisma.module';
 
 @Module({
-  imports: [
-    PrismaModule,
-    BullModule.registerQueue({ name: 'notifications' }),
-  ],
+  imports: [PrismaModule, BullModule.registerQueue({ name: 'notifications' })],
   controllers: [NotificationsController],
   providers: [NotificationsService],
   exports: [NotificationsService],

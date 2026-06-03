@@ -1,4 +1,11 @@
-import { IsString, IsEnum, IsNumber, IsOptional, IsInt, IsObject } from 'class-validator';
+import {
+  IsString,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsInt,
+  IsObject,
+} from 'class-validator';
 
 export enum PaymentProvider {
   CLICK = 'click',

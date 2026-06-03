@@ -8,7 +8,11 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { WalletService } from '../wallet/wallet.service';
-import { FamilyMemberRole, BattleStatus, TransactionType } from '@prisma/client';
+import {
+  FamilyMemberRole,
+  BattleStatus,
+  TransactionType,
+} from '@prisma/client';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import { Redis } from 'ioredis';
 import dayjs from 'dayjs';
@@ -84,7 +88,13 @@ export class FamilyService {
       where: { id: familyId },
       include: {
         owner: {
-          select: { id: true, uid: true, displayName: true, avatar: true, isVip: true },
+          select: {
+            id: true,
+            uid: true,
+            displayName: true,
+            avatar: true,
+            isVip: true,
+          },
         },
         members: {
           include: {
@@ -183,11 +193,6 @@ export class FamilyService {
       },
     });
 
-    await this.prisma.family.update({
-      where: { id: familyId },
-      data: { memberCount: { increment: 1 } },
-    });
-
     return member;
   }
 
@@ -199,16 +204,13 @@ export class FamilyService {
     if (!member) throw new NotFoundException('You are not in this family');
 
     if (member.role === FamilyMemberRole.OWNER) {
-      throw new BadRequestException('Owner cannot leave family. Transfer ownership first or disband.');
+      throw new BadRequestException(
+        'Owner cannot leave family. Transfer ownership first or disband.',
+      );
     }
 
     await this.prisma.familyMember.delete({
       where: { familyId_userId: { familyId, userId } },
-    });
-
-    await this.prisma.family.update({
-      where: { id: familyId },
-      data: { memberCount: { decrement: 1 } },
     });
 
     return { message: 'Left family successfully' };
@@ -219,8 +221,17 @@ export class FamilyService {
       where: { familyId_userId: { familyId, userId: adminId } },
     });
 
-    if (!adminMember || ![FamilyMemberRole.OWNER, FamilyMemberRole.CO_OWNER, FamilyMemberRole.ADMIN].includes(adminMember.role)) {
-      throw new ForbiddenException('Insufficient permissions to invite members');
+    if (
+      !adminMember ||
+      ![
+        FamilyMemberRole.OWNER,
+        FamilyMemberRole.CO_OWNER,
+        FamilyMemberRole.ADMIN,
+      ].includes(adminMember.role as any)
+    ) {
+      throw new ForbiddenException(
+        'Insufficient permissions to invite members',
+      );
     }
 
     const existingMembership = await this.prisma.familyMember.findFirst({
@@ -234,7 +245,12 @@ export class FamilyService {
     return { message: 'Invitation sent', familyId, targetUserId };
   }
 
-  async promoteMember(adminId: string, familyId: string, targetUserId: string, newRole: FamilyMemberRole) {
+  async promoteMember(
+    adminId: string,
+    familyId: string,
+    targetUserId: string,
+    newRole: FamilyMemberRole,
+  ) {
     const adminMember = await this.prisma.familyMember.findUnique({
       where: { familyId_userId: { familyId, userId: adminId } },
     });
@@ -260,7 +276,14 @@ export class FamilyService {
       where: { familyId_userId: { familyId, userId: adminId } },
     });
 
-    if (!adminMember || ![FamilyMemberRole.OWNER, FamilyMemberRole.CO_OWNER, FamilyMemberRole.ADMIN].includes(adminMember.role)) {
+    if (
+      !adminMember ||
+      ![
+        FamilyMemberRole.OWNER,
+        FamilyMemberRole.CO_OWNER,
+        FamilyMemberRole.ADMIN,
+      ].includes(adminMember.role as any)
+    ) {
       throw new ForbiddenException('Insufficient permissions');
     }
 
@@ -278,18 +301,16 @@ export class FamilyService {
       where: { familyId_userId: { familyId, userId: targetUserId } },
     });
 
-    await this.prisma.family.update({
-      where: { id: familyId },
-      data: { memberCount: { decrement: 1 } },
-    });
-
     return { message: 'Member kicked successfully' };
   }
 
   async updateFamily(ownerId: string, familyId: string, data: any) {
-    const family = await this.prisma.family.findUnique({ where: { id: familyId } });
+    const family = await this.prisma.family.findUnique({
+      where: { id: familyId },
+    });
     if (!family) throw new NotFoundException('Family not found');
-    if (family.ownerId !== ownerId) throw new ForbiddenException('Only owner can update family');
+    if (family.ownerId !== ownerId)
+      throw new ForbiddenException('Only owner can update family');
 
     return this.prisma.family.update({
       where: { id: familyId },
@@ -297,7 +318,10 @@ export class FamilyService {
     });
   }
 
-  async getFamilyRanking(period: 'daily' | 'weekly' | 'monthly' = 'weekly', limit = 50) {
+  async getFamilyRanking(
+    period: 'daily' | 'weekly' | 'monthly' = 'weekly',
+    limit = 50,
+  ) {
     const key = `family_ranking:${period}`;
     const cached = await this.redis.get(key);
 
@@ -331,9 +355,7 @@ export class FamilyService {
 
     await this.walletService.deductDiamonds(
       userId,
-      donateAmount,
-      TransactionType.TRANSFER,
-      familyId,
+      Number(donateAmount),
       `Donation to family treasury`,
     );
 
@@ -360,15 +382,20 @@ export class FamilyService {
     duration = 3600,
   ) {
     const challengerMember = await this.prisma.familyMember.findUnique({
-      where: { familyId_userId: { familyId: challengerFamilyId, userId: ownerId } },
+      where: {
+        familyId_userId: { familyId: challengerFamilyId, userId: ownerId },
+      },
     });
 
     if (!challengerMember || challengerMember.role !== FamilyMemberRole.OWNER) {
       throw new ForbiddenException('Only family owner can start battles');
     }
 
-    const defenderFamily = await this.prisma.family.findUnique({ where: { id: defenderFamilyId } });
-    if (!defenderFamily) throw new NotFoundException('Defender family not found');
+    const defenderFamily = await this.prisma.family.findUnique({
+      where: { id: defenderFamilyId },
+    });
+    if (!defenderFamily)
+      throw new NotFoundException('Defender family not found');
 
     const activeBattle = await this.prisma.familyBattle.findFirst({
       where: {

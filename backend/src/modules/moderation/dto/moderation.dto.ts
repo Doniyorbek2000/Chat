@@ -1,4 +1,11 @@
-import { IsString, IsEnum, IsOptional, IsInt, IsBoolean, Min } from 'class-validator';
+import {
+  IsString,
+  IsEnum,
+  IsOptional,
+  IsInt,
+  IsBoolean,
+  Min,
+} from 'class-validator';
 import { ReportTargetType, ReportStatus, BanType } from '@prisma/client';
 
 export class ReportUserDto {

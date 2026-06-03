@@ -14,7 +14,12 @@ import {
   BroadcastDto,
   UpdateUserDto,
 } from './dto/admin.dto';
-import { BanType, WithdrawalStatus, GiftCategory, GiftType } from '@prisma/client';
+import {
+  BanType,
+  WithdrawalStatus,
+  GiftCategory,
+  GiftType,
+} from '@prisma/client';
 import * as dayjs from 'dayjs';
 
 @Injectable()
@@ -51,8 +56,12 @@ export class AdminService {
       this.prisma.user.count({ where: { createdAt: { gte: weekStart } } }),
       this.prisma.user.count({ where: { createdAt: { gte: monthStart } } }),
       this.prisma.voiceRoom.count({ where: { isLive: true } }),
-      this.prisma.transaction.count({ where: { createdAt: { gte: todayStart } } }),
-      this.prisma.transaction.count({ where: { createdAt: { gte: monthStart } } }),
+      this.prisma.transaction.count({
+        where: { createdAt: { gte: todayStart } },
+      }),
+      this.prisma.transaction.count({
+        where: { createdAt: { gte: monthStart } },
+      }),
       this.prisma.user.count({ where: { isVip: true } }),
       this.prisma.transaction.aggregate({
         where: { type: 'RECHARGE', createdAt: { gte: todayStart } },
@@ -152,7 +161,12 @@ export class AdminService {
           level: true,
           createdAt: true,
           wallet: {
-            select: { coins: true, diamonds: true, totalRecharge: true, totalEarned: true },
+            select: {
+              coins: true,
+              diamonds: true,
+              totalRecharge: true,
+              totalEarned: true,
+            },
           },
         },
       }),
@@ -176,7 +190,9 @@ export class AdminService {
         bans: {
           orderBy: { createdAt: 'desc' },
           take: 5,
-          include: { admin: { select: { id: true, displayName: true, uid: true } } },
+          include: {
+            admin: { select: { id: true, displayName: true, uid: true } },
+          },
         },
         vipSubscriptions: {
           where: { isActive: true },
@@ -212,7 +228,9 @@ export class AdminService {
       },
     });
 
-    await this.createAuditLog(adminId, 'UPDATE_USER', 'User', userId, { changes: data });
+    await this.createAuditLog(adminId, 'UPDATE_USER', 'User', userId, {
+      changes: data,
+    });
 
     return updated;
   }
@@ -225,8 +243,8 @@ export class AdminService {
     const bannedUntil = dto.isPermanent
       ? null
       : dto.bannedUntil
-      ? new Date(dto.bannedUntil)
-      : null;
+        ? new Date(dto.bannedUntil)
+        : null;
 
     const [updatedUser] = await this.prisma.$transaction([
       this.prisma.user.update({
@@ -287,7 +305,13 @@ export class AdminService {
         orderBy: { createdAt: 'desc' },
         include: {
           user: {
-            select: { id: true, uid: true, displayName: true, avatar: true, phone: true },
+            select: {
+              id: true,
+              uid: true,
+              displayName: true,
+              avatar: true,
+              phone: true,
+            },
           },
           processor: {
             select: { id: true, uid: true, displayName: true },
@@ -324,15 +348,25 @@ export class AdminService {
       },
     });
 
-    await this.createAuditLog(adminId, 'APPROVE_WITHDRAWAL', 'Withdrawal', withdrawalId, {
-      amount: Number(withdrawal.amount),
-      userId: withdrawal.userId,
-    });
+    await this.createAuditLog(
+      adminId,
+      'APPROVE_WITHDRAWAL',
+      'Withdrawal',
+      withdrawalId,
+      {
+        amount: Number(withdrawal.amount),
+        userId: withdrawal.userId,
+      },
+    );
 
     return updated;
   }
 
-  async rejectWithdrawal(adminId: string, withdrawalId: string, dto: RejectWithdrawalDto) {
+  async rejectWithdrawal(
+    adminId: string,
+    withdrawalId: string,
+    dto: RejectWithdrawalDto,
+  ) {
     const withdrawal = await this.prisma.withdrawal.findUnique({
       where: { id: withdrawalId },
     });
@@ -359,11 +393,17 @@ export class AdminService {
       },
     });
 
-    await this.createAuditLog(adminId, 'REJECT_WITHDRAWAL', 'Withdrawal', withdrawalId, {
-      reason: dto.reason,
-      amount: Number(withdrawal.amount),
-      userId: withdrawal.userId,
-    });
+    await this.createAuditLog(
+      adminId,
+      'REJECT_WITHDRAWAL',
+      'Withdrawal',
+      withdrawalId,
+      {
+        reason: dto.reason,
+        amount: Number(withdrawal.amount),
+        userId: withdrawal.userId,
+      },
+    );
 
     return updated;
   }
@@ -403,9 +443,13 @@ export class AdminService {
         ...(data.category && { category: data.category as GiftCategory }),
         ...(data.type && { type: data.type as GiftType }),
         ...(data.imageUrl && { imageUrl: data.imageUrl }),
-        ...(data.animationUrl !== undefined && { animationUrl: data.animationUrl }),
+        ...(data.animationUrl !== undefined && {
+          animationUrl: data.animationUrl,
+        }),
         ...(data.coinPrice !== undefined && { coinPrice: data.coinPrice }),
-        ...(data.diamondPrice !== undefined && { diamondPrice: data.diamondPrice }),
+        ...(data.diamondPrice !== undefined && {
+          diamondPrice: data.diamondPrice,
+        }),
         ...(data.sortOrder !== undefined && { sortOrder: data.sortOrder }),
         ...(data.isActive !== undefined && { isActive: data.isActive }),
       },
@@ -429,7 +473,9 @@ export class AdminService {
 
     // In production: integrate Firebase Admin SDK to send FCM notifications
     // For now, create a notification record for all users in batches
-    const userCount = await this.prisma.user.count({ where: { isBanned: false } });
+    const userCount = await this.prisma.user.count({
+      where: { isBanned: false },
+    });
 
     this.logger.log(`[BROADCAST] Would send to ${userCount} users`);
 
@@ -461,7 +507,10 @@ export class AdminService {
     });
     const adminMap = Object.fromEntries(admins.map((a) => [a.id, a]));
 
-    const data = logs.map((log) => ({ ...log, admin: adminMap[log.adminId] || null }));
+    const data = logs.map((log) => ({
+      ...log,
+      admin: adminMap[log.adminId] || null,
+    }));
 
     return {
       data,
@@ -475,43 +524,71 @@ export class AdminService {
   // ==================== REVENUE ====================
 
   async getRevenueSummary(startDate?: string, endDate?: string) {
-    const start = startDate ? new Date(startDate) : dayjs().subtract(30, 'day').toDate();
+    const start = startDate
+      ? new Date(startDate)
+      : dayjs().subtract(30, 'day').toDate();
     const end = endDate ? new Date(endDate) : new Date();
     const today = dayjs().startOf('day').toDate();
     const weekStart = dayjs().startOf('week').toDate();
     const monthStart = dayjs().startOf('month').toDate();
 
-    const [total, todayRevenue, weekRevenue, monthRevenue, pendingWithdrawals, paymentBreakdown] =
-      await Promise.all([
-        this.prisma.transaction.aggregate({
-          where: { type: 'RECHARGE', status: 'COMPLETED', createdAt: { gte: start, lte: end } },
-          _sum: { amount: true },
-          _count: true,
-        }),
-        this.prisma.transaction.aggregate({
-          where: { type: 'RECHARGE', status: 'COMPLETED', createdAt: { gte: today } },
-          _sum: { amount: true },
-        }),
-        this.prisma.transaction.aggregate({
-          where: { type: 'RECHARGE', status: 'COMPLETED', createdAt: { gte: weekStart } },
-          _sum: { amount: true },
-        }),
-        this.prisma.transaction.aggregate({
-          where: { type: 'RECHARGE', status: 'COMPLETED', createdAt: { gte: monthStart } },
-          _sum: { amount: true },
-        }),
-        this.prisma.withdrawal.aggregate({
-          where: { status: 'PENDING' },
-          _sum: { amount: true },
-          _count: true,
-        }),
-        this.prisma.transaction.groupBy({
-          by: ['referenceType'],
-          where: { type: 'RECHARGE', status: 'COMPLETED', createdAt: { gte: start, lte: end } },
-          _sum: { amount: true },
-          _count: true,
-        }),
-      ]);
+    const [
+      total,
+      todayRevenue,
+      weekRevenue,
+      monthRevenue,
+      pendingWithdrawals,
+      paymentBreakdown,
+    ] = await Promise.all([
+      this.prisma.transaction.aggregate({
+        where: {
+          type: 'RECHARGE',
+          status: 'COMPLETED',
+          createdAt: { gte: start, lte: end },
+        },
+        _sum: { amount: true },
+        _count: true,
+      }),
+      this.prisma.transaction.aggregate({
+        where: {
+          type: 'RECHARGE',
+          status: 'COMPLETED',
+          createdAt: { gte: today },
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.transaction.aggregate({
+        where: {
+          type: 'RECHARGE',
+          status: 'COMPLETED',
+          createdAt: { gte: weekStart },
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.transaction.aggregate({
+        where: {
+          type: 'RECHARGE',
+          status: 'COMPLETED',
+          createdAt: { gte: monthStart },
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.withdrawal.aggregate({
+        where: { status: 'PENDING' },
+        _sum: { amount: true },
+        _count: true,
+      }),
+      this.prisma.transaction.groupBy({
+        by: ['referenceType'],
+        where: {
+          type: 'RECHARGE',
+          status: 'COMPLETED',
+          createdAt: { gte: start, lte: end },
+        },
+        _sum: { amount: true },
+        _count: true,
+      }),
+    ]);
 
     return {
       total: Number(total._sum.amount || 0),
@@ -529,11 +606,18 @@ export class AdminService {
     };
   }
 
-  async getRevenueChart(period: 'daily' | 'weekly' | 'monthly' = 'daily', days = 30) {
+  async getRevenueChart(
+    period: 'daily' | 'weekly' | 'monthly' = 'daily',
+    days = 30,
+  ) {
     const start = dayjs().subtract(days, 'day').startOf('day').toDate();
 
     const transactions = await this.prisma.transaction.findMany({
-      where: { type: 'RECHARGE', status: 'COMPLETED', createdAt: { gte: start } },
+      where: {
+        type: 'RECHARGE',
+        status: 'COMPLETED',
+        createdAt: { gte: start },
+      },
       select: { amount: true, createdAt: true },
       orderBy: { createdAt: 'asc' },
     });
@@ -572,7 +656,14 @@ export class AdminService {
     const userIds = topUsers.map((u) => u.userId);
     const users = await this.prisma.user.findMany({
       where: { id: { in: userIds } },
-      select: { id: true, uid: true, username: true, displayName: true, avatar: true, vipLevel: true },
+      select: {
+        id: true,
+        uid: true,
+        username: true,
+        displayName: true,
+        avatar: true,
+        vipLevel: true,
+      },
     });
     const userMap = Object.fromEntries(users.map((u) => [u.id, u]));
 

@@ -24,6 +24,10 @@ import '../../features/messages/presentation/screens/chat_screen.dart';
 import '../../features/notifications/presentation/screens/notifications_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/agency/presentation/screens/agency_screen.dart';
+import '../../features/couple/presentation/screens/couple_screen.dart';
+import '../../features/events/presentation/screens/events_screen.dart';
+import '../../features/events/presentation/screens/event_detail_screen.dart';
+import '../../features/rewards/presentation/screens/daily_rewards_screen.dart';
 import '../providers/auth_provider.dart';
 
 class AppRoutes {
@@ -53,6 +57,10 @@ class AppRoutes {
   static const String notifications = '/notifications';
   static const String settings = '/settings';
   static const String agency = '/agency';
+  static const String couple = '/couple';
+  static const String events = '/events';
+  static const String eventDetail = '/events/:id';
+  static const String dailyRewards = '/rewards/daily';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -266,6 +274,37 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => _buildPage(
           state,
           const AgencyScreen(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.couple,
+        pageBuilder: (context, state) => _buildPage(
+          state,
+          const CoupleScreen(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.events,
+        pageBuilder: (context, state) => _buildPage(
+          state,
+          const EventsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/events/:id',
+        pageBuilder: (context, state) {
+          final eventId = state.pathParameters['id']!;
+          return _buildPage(
+            state,
+            EventDetailScreen(eventId: eventId),
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.dailyRewards,
+        pageBuilder: (context, state) => _buildPage(
+          state,
+          const DailyRewardsScreen(),
         ),
       ),
     ],

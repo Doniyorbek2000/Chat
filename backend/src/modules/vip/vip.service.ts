@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { WalletService } from '../wallet/wallet.service';
-import { TransactionType, Currency } from '@prisma/client';
+import { Currency } from '@prisma/client';
 import dayjs from 'dayjs';
 
 @Injectable()
@@ -56,8 +56,11 @@ export class VipService {
   }
 
   async purchaseVip(userId: string, planId: string) {
-    const plan = await this.prisma.vipPlan.findUnique({ where: { id: planId } });
-    if (!plan || !plan.isActive) throw new NotFoundException('VIP plan not found');
+    const plan = await this.prisma.vipPlan.findUnique({
+      where: { id: planId },
+    });
+    if (!plan || !plan.isActive)
+      throw new NotFoundException('VIP plan not found');
 
     const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
     if (!wallet) throw new NotFoundException('Wallet not found');
@@ -70,11 +73,9 @@ export class VipService {
       }
       await this.walletService.deductCoins(
         userId,
-        price,
-        TransactionType.VIP_PURCHASE,
-        planId,
-        'VIP_PLAN',
+        Number(price),
         `VIP ${plan.name} subscription`,
+        planId,
       );
     } else {
       if (wallet.diamonds < price) {
@@ -82,9 +83,7 @@ export class VipService {
       }
       await this.walletService.deductDiamonds(
         userId,
-        price,
-        TransactionType.VIP_PURCHASE,
-        planId,
+        Number(price),
         `VIP ${plan.name} subscription`,
       );
     }
@@ -171,8 +170,10 @@ export class VipService {
     if (user.vipLevel >= 1) benefits.push('exclusive_frame', 'entry_effect');
     if (user.vipLevel >= 3) benefits.push('chat_bubble', 'exclusive_gifts');
     if (user.vipLevel >= 5) benefits.push('no_ads', 'priority_seat');
-    if (user.vipLevel >= 7) benefits.push('exclusive_vehicle', 'vip_room_access');
-    if (user.vipLevel >= 10) benefits.push('global_announcement', 'dedicated_support');
+    if (user.vipLevel >= 7)
+      benefits.push('exclusive_vehicle', 'vip_room_access');
+    if (user.vipLevel >= 10)
+      benefits.push('global_announcement', 'dedicated_support');
 
     return { hasVip: true, vipLevel: user.vipLevel, benefits };
   }

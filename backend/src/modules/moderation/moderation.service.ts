@@ -2,7 +2,13 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ReportUserDto, BanUserDto, MuteUserDto, ResolveReportDto, GetReportsDto } from './dto/moderation.dto';
+import {
+  ReportUserDto,
+  BanUserDto,
+  MuteUserDto,
+  ResolveReportDto,
+  GetReportsDto,
+} from './dto/moderation.dto';
 import { ReportStatus, BanType } from '@prisma/client';
 
 @Injectable()
@@ -37,7 +43,14 @@ export class ModerationService {
         skip,
         take: limit,
         include: {
-          reporter: { select: { id: true, username: true, displayName: true, avatar: true } },
+          reporter: {
+            select: {
+              id: true,
+              username: true,
+              displayName: true,
+              avatar: true,
+            },
+          },
         },
       }),
       this.prisma.report.count({ where }),
@@ -46,8 +59,14 @@ export class ModerationService {
     return { items, total, page, limit, pages: Math.ceil(total / limit) };
   }
 
-  async resolveReport(adminId: string, reportId: string, dto: ResolveReportDto) {
-    const report = await this.prisma.report.findUnique({ where: { id: reportId } });
+  async resolveReport(
+    adminId: string,
+    reportId: string,
+    dto: ResolveReportDto,
+  ) {
+    const report = await this.prisma.report.findUnique({
+      where: { id: reportId },
+    });
     if (!report) throw new NotFoundException('Report not found');
 
     return this.prisma.report.update({
@@ -62,9 +81,10 @@ export class ModerationService {
   }
 
   async banUser(adminId: string, dto: BanUserDto) {
-    const bannedUntil = dto.durationHours && !dto.isPermanent
-      ? new Date(Date.now() + dto.durationHours * 3600 * 1000)
-      : null;
+    const bannedUntil =
+      dto.durationHours && !dto.isPermanent
+        ? new Date(Date.now() + dto.durationHours * 3600 * 1000)
+        : null;
 
     const [ban] = await this.prisma.$transaction([
       this.prisma.ban.create({
@@ -79,7 +99,12 @@ export class ModerationService {
         },
       }),
       ...(dto.type === BanType.PLATFORM || dto.isPermanent
-        ? [this.prisma.user.update({ where: { id: dto.userId }, data: { isBanned: true } })]
+        ? [
+            this.prisma.user.update({
+              where: { id: dto.userId },
+              data: { isBanned: true },
+            }),
+          ]
         : []),
     ]);
 
@@ -89,7 +114,10 @@ export class ModerationService {
   async unbanUser(adminId: string, userId: string) {
     await this.prisma.$transaction([
       this.prisma.ban.deleteMany({ where: { userId } }),
-      this.prisma.user.update({ where: { id: userId }, data: { isBanned: false } }),
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { isBanned: false },
+      }),
     ]);
     return { unbanned: true };
   }
@@ -123,7 +151,9 @@ export class ModerationService {
       where: { targetId },
       orderBy: { createdAt: 'desc' },
       include: {
-        reporter: { select: { id: true, username: true, displayName: true, avatar: true } },
+        reporter: {
+          select: { id: true, username: true, displayName: true, avatar: true },
+        },
       },
     });
   }

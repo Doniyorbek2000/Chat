@@ -1,11 +1,11 @@
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import {
-  Controller,
-  Get,
-  Param,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery, ApiParam } from '@nestjs/swagger';
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiParam,
+} from '@nestjs/swagger';
 import { LeaderboardService } from './leaderboard.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -18,23 +18,31 @@ export class LeaderboardController {
 
   @Get('gifters')
   @ApiOperation({ summary: 'Get top gifters ranking' })
-  @ApiQuery({ name: 'period', required: false, enum: ['daily', 'weekly', 'monthly', 'alltime'] })
+  @ApiQuery({
+    name: 'period',
+    required: false,
+    enum: ['daily', 'weekly', 'monthly', 'alltime'],
+  })
   @ApiQuery({ name: 'limit', required: false })
   getGiftersRanking(
     @Query('period') period: any = 'weekly',
     @Query('limit') limit = 50,
   ) {
-    return this.leaderboardService.getGiftersRanking(period, +limit);
+    return this.leaderboardService.getGiftRanking(period, +limit);
   }
 
   @Get('receivers')
   @ApiOperation({ summary: 'Get top receivers ranking' })
-  @ApiQuery({ name: 'period', required: false, enum: ['daily', 'weekly', 'monthly', 'alltime'] })
+  @ApiQuery({
+    name: 'period',
+    required: false,
+    enum: ['daily', 'weekly', 'monthly', 'alltime'],
+  })
   getReceiversRanking(
     @Query('period') period: any = 'weekly',
     @Query('limit') limit = 50,
   ) {
-    return this.leaderboardService.getReceiversRanking(period, +limit);
+    return this.leaderboardService.getUserRanking(period, +limit);
   }
 
   @Get('rooms')
@@ -43,7 +51,7 @@ export class LeaderboardController {
     @Query('period') period: any = 'weekly',
     @Query('limit') limit = 50,
   ) {
-    return this.leaderboardService.getRoomsRanking(period, +limit);
+    return this.leaderboardService.getRoomRanking(period, +limit);
   }
 
   @Get('families')
@@ -52,13 +60,13 @@ export class LeaderboardController {
     @Query('period') period: any = 'weekly',
     @Query('limit') limit = 50,
   ) {
-    return this.leaderboardService.getFamiliesRanking(period, +limit);
+    return this.leaderboardService.getFamilyRanking(period, +limit);
   }
 
   @Get('couples')
   @ApiOperation({ summary: 'Get top couples ranking' })
   getCouplesRanking(@Query('limit') limit = 50) {
-    return this.leaderboardService.getCouplesRanking('alltime', +limit);
+    return this.leaderboardService.getCoupleRanking('weekly', +limit);
   }
 
   @Get('recharge')
@@ -72,8 +80,15 @@ export class LeaderboardController {
 
   @Get(':type')
   @ApiOperation({ summary: 'Get leaderboard by type and period' })
-  @ApiParam({ name: 'type', enum: ['gifters', 'receivers', 'rooms', 'families', 'couples', 'recharge'] })
-  @ApiQuery({ name: 'period', required: false, enum: ['daily', 'weekly', 'monthly', 'alltime'] })
+  @ApiParam({
+    name: 'type',
+    enum: ['gifters', 'receivers', 'rooms', 'families', 'couples', 'recharge'],
+  })
+  @ApiQuery({
+    name: 'period',
+    required: false,
+    enum: ['daily', 'weekly', 'monthly', 'alltime'],
+  })
   getLeaderboard(
     @Param('type') type: string,
     @Query('period') period: any = 'weekly',
@@ -81,19 +96,19 @@ export class LeaderboardController {
   ) {
     switch (type) {
       case 'gifters':
-        return this.leaderboardService.getGiftersRanking(period, +limit);
+        return this.leaderboardService.getGiftRanking(period, +limit);
       case 'receivers':
-        return this.leaderboardService.getReceiversRanking(period, +limit);
+        return this.leaderboardService.getUserRanking(period, +limit);
       case 'rooms':
-        return this.leaderboardService.getRoomsRanking(period, +limit);
+        return this.leaderboardService.getRoomRanking(period, +limit);
       case 'families':
-        return this.leaderboardService.getFamiliesRanking(period, +limit);
+        return this.leaderboardService.getFamilyRanking(period, +limit);
       case 'couples':
-        return this.leaderboardService.getCouplesRanking(period, +limit);
+        return this.leaderboardService.getCoupleRanking(period, +limit);
       case 'recharge':
         return this.leaderboardService.getRechargeRanking(period, +limit);
       default:
-        return this.leaderboardService.getGiftersRanking(period, +limit);
+        return this.leaderboardService.getGiftRanking(period, +limit);
     }
   }
 }

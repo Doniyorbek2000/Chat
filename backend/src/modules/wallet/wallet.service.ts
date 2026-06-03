@@ -6,7 +6,13 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { TransferDto, WithdrawDto } from './dto/wallet.dto';
-import { TransactionType, Currency, WithdrawalMethod, WithdrawalStatus, TransactionStatus } from '@prisma/client';
+import {
+  TransactionType,
+  Currency,
+  WithdrawalMethod,
+  WithdrawalStatus,
+  TransactionStatus,
+} from '@prisma/client';
 import * as Redis from 'ioredis';
 
 @Injectable()
@@ -17,7 +23,9 @@ export class WalletService {
     private prisma: PrismaService,
     private config: ConfigService,
   ) {
-    this.redis = new Redis.Redis(this.config.get<string>('redis.url') || 'redis://localhost:6379');
+    this.redis = new Redis.Redis(
+      this.config.get<string>('redis.url') || 'redis://localhost:6379',
+    );
   }
 
   async getBalance(userId: string) {
@@ -26,7 +34,12 @@ export class WalletService {
     return wallet;
   }
 
-  async addCoins(userId: string, amount: number, description: string, referenceId?: string) {
+  async addCoins(
+    userId: string,
+    amount: number,
+    description: string,
+    referenceId?: string,
+  ) {
     const lockKey = `wallet_lock:${userId}`;
     await this.redis.set(lockKey, '1', 'EX', 5, 'NX');
 
@@ -46,7 +59,7 @@ export class WalletService {
             currency: Currency.COINS,
             amount,
             balanceBefore: before,
-            balanceAfter: before + amount,
+            balanceAfter: Number(before) + amount,
             description,
             referenceId,
             status: TransactionStatus.COMPLETED,
@@ -60,7 +73,12 @@ export class WalletService {
     }
   }
 
-  async deductCoins(userId: string, amount: number, description: string, referenceId?: string) {
+  async deductCoins(
+    userId: string,
+    amount: number,
+    description: string,
+    referenceId?: string,
+  ) {
     const lockKey = `wallet_lock:${userId}`;
     await this.redis.set(lockKey, '1', 'EX', 5, 'NX');
 
@@ -82,7 +100,7 @@ export class WalletService {
             currency: Currency.COINS,
             amount: -amount,
             balanceBefore: wallet.coins,
-            balanceAfter: wallet.coins - amount,
+            balanceAfter: Number(wallet.coins) - amount,
             description,
             referenceId,
             status: TransactionStatus.COMPLETED,
@@ -96,14 +114,22 @@ export class WalletService {
     }
   }
 
-  async addDiamonds(userId: string, amount: number, description: string, referenceId?: string) {
+  async addDiamonds(
+    userId: string,
+    amount: number,
+    description: string,
+    referenceId?: string,
+  ) {
     const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
     const before = wallet?.diamonds || 0;
 
     const [updated] = await this.prisma.$transaction([
       this.prisma.wallet.update({
         where: { userId },
-        data: { diamonds: { increment: amount }, totalEarned: { increment: amount } },
+        data: {
+          diamonds: { increment: amount },
+          totalEarned: { increment: amount },
+        },
       }),
       this.prisma.transaction.create({
         data: {
@@ -112,7 +138,7 @@ export class WalletService {
           currency: Currency.DIAMONDS,
           amount,
           balanceBefore: before,
-          balanceAfter: before + amount,
+          balanceAfter: Number(before) + amount,
           description,
           referenceId,
           status: TransactionStatus.COMPLETED,
@@ -136,32 +162,55 @@ export class WalletService {
   }
 
   async transfer(senderId: string, dto: TransferDto) {
-    const { receiverUid, amount, currency } = dto;
+    const { receiverUid, amount } = dto;
+    const currency = Currency.COINS;
 
-    const receiver = await this.prisma.user.findUnique({ where: { uid: receiverUid } });
+    const receiver = await this.prisma.user.findUnique({
+      where: { uid: receiverUid },
+    });
     if (!receiver) throw new NotFoundException('Recipient not found');
-    if (receiver.id === senderId) throw new BadRequestException('Cannot transfer to yourself');
+    if (receiver.id === senderId)
+      throw new BadRequestException('Cannot transfer to yourself');
 
     if (currency === Currency.COINS) {
-      const wallet = await this.prisma.wallet.findUnique({ where: { userId: senderId } });
-      if (!wallet || wallet.coins < amount) throw new BadRequestException('Insufficient coins');
+      const wallet = await this.prisma.wallet.findUnique({
+        where: { userId: senderId },
+      });
+      if (!wallet || wallet.coins < amount)
+        throw new BadRequestException('Insufficient coins');
 
       await this.prisma.$transaction([
-        this.prisma.wallet.update({ where: { userId: senderId }, data: { coins: { decrement: amount } } }),
-        this.prisma.wallet.update({ where: { userId: receiver.id }, data: { coins: { increment: amount } } }),
+        this.prisma.wallet.update({
+          where: { userId: senderId },
+          data: { coins: { decrement: amount } },
+        }),
+        this.prisma.wallet.update({
+          where: { userId: receiver.id },
+          data: { coins: { increment: amount } },
+        }),
         this.prisma.transaction.create({
           data: {
-            userId: senderId, type: TransactionType.TRANSFER, currency,
-            amount: -amount, balanceBefore: wallet.coins, balanceAfter: wallet.coins - amount,
-            description: `Transfer to ${receiverUid}`, referenceId: receiver.id,
+            userId: senderId,
+            type: TransactionType.TRANSFER,
+            currency,
+            amount: -amount,
+            balanceBefore: Number(wallet.coins),
+            balanceAfter: Number(wallet.coins) - amount,
+            description: `Transfer to ${receiverUid}`,
+            referenceId: receiver.id,
             status: TransactionStatus.COMPLETED,
           },
         }),
         this.prisma.transaction.create({
           data: {
-            userId: receiver.id, type: TransactionType.TRANSFER, currency,
-            amount, balanceBefore: 0, balanceAfter: amount,
-            description: `Received from sender`, referenceId: senderId,
+            userId: receiver.id,
+            type: TransactionType.TRANSFER,
+            currency,
+            amount,
+            balanceBefore: 0,
+            balanceAfter: amount,
+            description: `Received from sender`,
+            referenceId: senderId,
             status: TransactionStatus.COMPLETED,
           },
         }),
@@ -189,13 +238,18 @@ export class WalletService {
     const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
     const MIN_WITHDRAW = 100;
 
-    if (!wallet || wallet.diamonds < dto.amount) throw new BadRequestException('Insufficient diamonds');
-    if (dto.amount < MIN_WITHDRAW) throw new BadRequestException(`Minimum withdrawal is ${MIN_WITHDRAW} diamonds`);
+    if (!wallet || wallet.diamonds < dto.amount)
+      throw new BadRequestException('Insufficient diamonds');
+    if (dto.amount < MIN_WITHDRAW)
+      throw new BadRequestException(
+        `Minimum withdrawal is ${MIN_WITHDRAW} diamonds`,
+      );
 
     const pendingCount = await this.prisma.withdrawal.count({
       where: { userId, status: WithdrawalStatus.PENDING },
     });
-    if (pendingCount >= 1) throw new BadRequestException('You have a pending withdrawal request');
+    if (pendingCount >= 1)
+      throw new BadRequestException('You have a pending withdrawal request');
 
     await this.prisma.$transaction([
       this.prisma.wallet.update({
@@ -217,11 +271,19 @@ export class WalletService {
     return { message: 'Withdrawal request submitted' };
   }
 
-  async processRecharge(userId: string, amount: number, coins: number, referenceId: string) {
+  async processRecharge(
+    userId: string,
+    amount: number,
+    coins: number,
+    referenceId: string,
+  ) {
     await this.prisma.$transaction([
       this.prisma.wallet.update({
         where: { userId },
-        data: { coins: { increment: coins }, totalRecharge: { increment: amount } },
+        data: {
+          coins: { increment: coins },
+          totalRecharge: { increment: amount },
+        },
       }),
       this.prisma.transaction.create({
         data: {

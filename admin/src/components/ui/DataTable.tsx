@@ -23,7 +23,7 @@ import { cn } from '@/lib/utils'
 
 interface DataTableProps<TData> {
   data: TData[]
-  columns: ColumnDef<TData, unknown>[]
+  columns: ColumnDef<TData, any>[]
   loading?: boolean
   total?: number
   page?: number

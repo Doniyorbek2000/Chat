@@ -90,6 +90,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     if (!client.userId) return;
     await this.chatService.markAsRead(client.userId, data.senderId);
-    this.server.to(`user:${data.senderId}`).emit('chat:read', { readBy: client.userId });
+    this.server
+      .to(`user:${data.senderId}`)
+      .emit('chat:read', { readBy: client.userId });
   }
 }

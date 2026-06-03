@@ -58,6 +58,7 @@ dependencies:
   smooth_page_indicator: ^1.1.0
   badges: ^3.1.2
   glassmorphism: ^3.0.0
+  in_app_purchase: ^3.1.13
 
 dev_dependencies:
   flutter_test:
@@ -75,9 +76,10 @@ flutter:
     - assets/images/
     - assets/icons/
     - assets/animations/
+    - assets/fonts/
+  # Font files: download Poppins from https://fonts.google.com/specimen/Poppins
+  # Place TTF files in assets/fonts/ then uncomment:
   # fonts:
-  #   Place Poppins font files in assets/fonts/ and uncomment to enable custom fonts.
-  #   Download from https://fonts.google.com/specimen/Poppins
   #   - family: Poppins
   #     fonts:
   #       - asset: assets/fonts/Poppins-Regular.ttf

@@ -150,7 +150,7 @@ export default function UserDetailPage() {
             </div>
 
             {user.bio && (
-              <p className="text-dark-300 text-sm mb-4 italic">"{user.bio}"</p>
+              <p className="text-dark-300 text-sm mb-4 italic">&ldquo;{user.bio}&rdquo;</p>
             )}
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

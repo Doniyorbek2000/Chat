@@ -73,7 +73,7 @@ export function ChartCard({
 }
 
 interface LineChartProps {
-  data: Record<string, unknown>[]
+  data: Record<string, any>[]
   lines: { key: string; label: string; color?: string }[]
   xKey: string
   loading?: boolean
@@ -116,7 +116,7 @@ export function VoxoLineChart({ data, lines, xKey, loading = false }: LineChartP
 }
 
 interface AreaChartProps {
-  data: Record<string, unknown>[]
+  data: Record<string, any>[]
   areas: { key: string; label: string; color?: string }[]
   xKey: string
 }
@@ -169,7 +169,7 @@ export function VoxoAreaChart({ data, areas, xKey }: AreaChartProps) {
 }
 
 interface BarChartProps {
-  data: Record<string, unknown>[]
+  data: Record<string, any>[]
   bars: { key: string; label: string; color?: string }[]
   xKey: string
 }

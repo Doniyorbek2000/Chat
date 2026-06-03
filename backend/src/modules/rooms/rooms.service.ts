@@ -20,7 +20,9 @@ export class RoomsService {
     private zegocloud: ZegocloudService,
     private config: ConfigService,
   ) {
-    this.redis = new Redis.Redis(this.config.get<string>('redis.url') || 'redis://localhost:6379');
+    this.redis = new Redis.Redis(
+      this.config.get<string>('redis.url') || 'redis://localhost:6379',
+    );
   }
 
   async createRoom(hostId: string, dto: CreateRoomDto) {
@@ -50,17 +52,39 @@ export class RoomsService {
           },
         },
       },
-      include: { host: { select: { id: true, uid: true, displayName: true, avatar: true, isVip: true, vipLevel: true } }, seats: { include: { user: true } } },
+      include: {
+        host: {
+          select: {
+            id: true,
+            uid: true,
+            displayName: true,
+            avatar: true,
+            isVip: true,
+            vipLevel: true,
+          },
+        },
+        seats: { include: { user: true } },
+      },
     });
 
     // Cache live room in Redis
-    await this.redis.setex(`room:live:${room.id}`, 3600, JSON.stringify({ id: room.id, title: room.title }));
+    await this.redis.setex(
+      `room:live:${room.id}`,
+      3600,
+      JSON.stringify({ id: room.id, title: room.title }),
+    );
     await this.redis.sadd('rooms:live', room.id);
 
     return room;
   }
 
-  async getRooms(filters: { type?: string; language?: string; search?: string; page?: number; limit?: number }) {
+  async getRooms(filters: {
+    type?: string;
+    language?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
     const { type, language, search, page = 1, limit = 20 } = filters;
 
     const where: any = { isLive: true };
@@ -77,13 +101,38 @@ export class RoomsService {
       this.prisma.voiceRoom.findMany({
         where,
         include: {
-          host: { select: { id: true, uid: true, displayName: true, avatar: true, isVip: true, vipLevel: true } },
-          seats: { where: { userId: { not: null } }, include: { user: { select: { id: true, displayName: true, avatar: true, isVip: true } } } },
+          host: {
+            select: {
+              id: true,
+              uid: true,
+              displayName: true,
+              avatar: true,
+              isVip: true,
+              vipLevel: true,
+            },
+          },
+          seats: {
+            where: { userId: { not: null } },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  displayName: true,
+                  avatar: true,
+                  isVip: true,
+                },
+              },
+            },
+          },
           _count: { select: { members: true } },
         },
         skip: (page - 1) * limit,
         take: limit,
-        orderBy: [{ totalGifts: 'desc' }, { viewerCount: 'desc' }, { createdAt: 'desc' }],
+        orderBy: [
+          { totalGifts: 'desc' },
+          { viewerCount: 'desc' },
+          { createdAt: 'desc' },
+        ],
       }),
       this.prisma.voiceRoom.count({ where }),
     ]);
@@ -95,18 +144,39 @@ export class RoomsService {
     const room = await this.prisma.voiceRoom.findUnique({
       where: { id: roomId },
       include: {
-        host: { select: { id: true, uid: true, displayName: true, avatar: true, isVip: true, vipLevel: true } },
+        host: {
+          select: {
+            id: true,
+            uid: true,
+            displayName: true,
+            avatar: true,
+            isVip: true,
+            vipLevel: true,
+          },
+        },
         seats: {
           include: {
             user: {
-              select: { id: true, uid: true, displayName: true, avatar: true, isVip: true, vipLevel: true, level: true },
+              select: {
+                id: true,
+                uid: true,
+                displayName: true,
+                avatar: true,
+                isVip: true,
+                vipLevel: true,
+                level: true,
+              },
             },
           },
           orderBy: { position: 'asc' },
         },
         members: {
           where: { leftAt: null },
-          include: { user: { select: { id: true, uid: true, displayName: true, avatar: true } } },
+          include: {
+            user: {
+              select: { id: true, uid: true, displayName: true, avatar: true },
+            },
+          },
           take: 50,
         },
       },
@@ -123,7 +193,9 @@ export class RoomsService {
   }
 
   async joinRoom(roomId: string, userId: string, password?: string) {
-    const room = await this.prisma.voiceRoom.findUnique({ where: { id: roomId } });
+    const room = await this.prisma.voiceRoom.findUnique({
+      where: { id: roomId },
+    });
     if (!room) throw new NotFoundException('Room not found');
     if (!room.isLive) throw new BadRequestException('Room is not live');
 
@@ -138,8 +210,13 @@ export class RoomsService {
 
     if (!existing) {
       await this.prisma.$transaction([
-        this.prisma.roomMember.create({ data: { roomId, userId, role: RoomMemberRole.LISTENER } }),
-        this.prisma.voiceRoom.update({ where: { id: roomId }, data: { viewerCount: { increment: 1 } } }),
+        this.prisma.roomMember.create({
+          data: { roomId, userId, role: RoomMemberRole.LISTENER },
+        }),
+        this.prisma.voiceRoom.update({
+          where: { id: roomId },
+          data: { viewerCount: { increment: 1 } },
+        }),
       ]);
     }
 
@@ -155,15 +232,23 @@ export class RoomsService {
 
     if (member) {
       await this.prisma.$transaction([
-        this.prisma.roomMember.update({ where: { id: member.id }, data: { leftAt: new Date() } }),
-        this.prisma.voiceRoom.update({ where: { id: roomId }, data: { viewerCount: { decrement: 1 } } }),
+        this.prisma.roomMember.update({
+          where: { id: member.id },
+          data: { leftAt: new Date() },
+        }),
+        this.prisma.voiceRoom.update({
+          where: { id: roomId },
+          data: { viewerCount: { decrement: 1 } },
+        }),
       ]);
     }
 
     // Free up seat if occupied
     await this.prisma.roomSeat.deleteMany({ where: { roomId, userId } });
 
-    const room = await this.prisma.voiceRoom.findUnique({ where: { id: roomId } });
+    const room = await this.prisma.voiceRoom.findUnique({
+      where: { id: roomId },
+    });
     // If host left, end room
     if (room?.hostId === userId) {
       await this.closeRoom(roomId);
@@ -226,8 +311,13 @@ export class RoomsService {
       where: { roomId, userId: targetUserId, leftAt: null },
       data: { leftAt: new Date() },
     });
-    await this.prisma.roomSeat.deleteMany({ where: { roomId, userId: targetUserId } });
-    await this.prisma.voiceRoom.update({ where: { id: roomId }, data: { viewerCount: { decrement: 1 } } });
+    await this.prisma.roomSeat.deleteMany({
+      where: { roomId, userId: targetUserId },
+    });
+    await this.prisma.voiceRoom.update({
+      where: { id: roomId },
+      data: { viewerCount: { decrement: 1 } },
+    });
     return { message: 'User kicked' };
   }
 
@@ -241,22 +331,38 @@ export class RoomsService {
     return { message: 'Seat locked' };
   }
 
-  async updateAnnouncement(roomId: string, hostId: string, announcement: string) {
-    const room = await this.prisma.voiceRoom.findUnique({ where: { id: roomId } });
-    if (!room || room.hostId !== hostId) throw new ForbiddenException('Only host can update announcement');
+  async updateAnnouncement(
+    roomId: string,
+    hostId: string,
+    announcement: string,
+  ) {
+    const room = await this.prisma.voiceRoom.findUnique({
+      where: { id: roomId },
+    });
+    if (!room || room.hostId !== hostId)
+      throw new ForbiddenException('Only host can update announcement');
 
-    return this.prisma.voiceRoom.update({ where: { id: roomId }, data: { announcement } });
+    return this.prisma.voiceRoom.update({
+      where: { id: roomId },
+      data: { announcement },
+    });
   }
 
   async updateRoom(roomId: string, hostId: string, dto: UpdateRoomDto) {
-    const room = await this.prisma.voiceRoom.findUnique({ where: { id: roomId } });
-    if (!room || room.hostId !== hostId) throw new ForbiddenException('Only host can update room');
+    const room = await this.prisma.voiceRoom.findUnique({
+      where: { id: roomId },
+    });
+    if (!room || room.hostId !== hostId)
+      throw new ForbiddenException('Only host can update room');
 
     return this.prisma.voiceRoom.update({ where: { id: roomId }, data: dto });
   }
 
   async closeRoom(roomId: string) {
-    await this.prisma.voiceRoom.update({ where: { id: roomId }, data: { isLive: false } });
+    await this.prisma.voiceRoom.update({
+      where: { id: roomId },
+      data: { isLive: false },
+    });
     await this.prisma.roomSeat.deleteMany({ where: { roomId } });
     await this.prisma.roomMember.updateMany({
       where: { roomId, leftAt: null },
@@ -274,25 +380,45 @@ export class RoomsService {
   async getRoomMembers(roomId: string, page = 1, limit = 50) {
     return this.prisma.roomMember.findMany({
       where: { roomId, leftAt: null },
-      include: { user: { select: { id: true, uid: true, displayName: true, avatar: true, isVip: true, vipLevel: true } } },
+      include: {
+        user: {
+          select: {
+            id: true,
+            uid: true,
+            displayName: true,
+            avatar: true,
+            isVip: true,
+            vipLevel: true,
+          },
+        },
+      },
       skip: (page - 1) * limit,
       take: limit,
     });
   }
 
   private async checkRoomAdmin(roomId: string, userId: string) {
-    const room = await this.prisma.voiceRoom.findUnique({ where: { id: roomId } });
+    const room = await this.prisma.voiceRoom.findUnique({
+      where: { id: roomId },
+    });
     if (!room) throw new NotFoundException('Room not found');
 
     const member = await this.prisma.roomMember.findFirst({
       where: {
         roomId,
         userId,
-        role: { in: [RoomMemberRole.HOST, RoomMemberRole.CO_HOST, RoomMemberRole.ADMIN] },
+        role: {
+          in: [
+            RoomMemberRole.HOST,
+            RoomMemberRole.CO_HOST,
+            RoomMemberRole.ADMIN,
+          ],
+        },
         leftAt: null,
       },
     });
 
-    if (!member && room.hostId !== userId) throw new ForbiddenException('Insufficient permissions');
+    if (!member && room.hostId !== userId)
+      throw new ForbiddenException('Insufficient permissions');
   }
 }

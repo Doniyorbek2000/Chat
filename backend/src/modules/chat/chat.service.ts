@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SendMessageDto } from './dto/chat.dto';
 import { ChatType } from '@prisma/client';
@@ -13,14 +17,32 @@ export class ChatService {
         where: { senderId: userId, deletedAt: null },
         orderBy: { createdAt: 'desc' },
         include: {
-          receiver: { select: { id: true, username: true, displayName: true, avatar: true, isOnline: true, lastSeen: true } },
+          receiver: {
+            select: {
+              id: true,
+              username: true,
+              displayName: true,
+              avatar: true,
+              isOnline: true,
+              lastSeen: true,
+            },
+          },
         },
       }),
       this.prisma.chat.findMany({
         where: { receiverId: userId, deletedAt: null },
         orderBy: { createdAt: 'desc' },
         include: {
-          sender: { select: { id: true, username: true, displayName: true, avatar: true, isOnline: true, lastSeen: true } },
+          sender: {
+            select: {
+              id: true,
+              username: true,
+              displayName: true,
+              avatar: true,
+              isOnline: true,
+              lastSeen: true,
+            },
+          },
         },
       }),
     ]);
@@ -31,7 +53,11 @@ export class ChatService {
       const otherId = msg.receiverId;
       const existing = convMap.get(otherId);
       if (!existing || existing.lastMessage.createdAt < msg.createdAt) {
-        convMap.set(otherId, { user: msg.receiver, lastMessage: msg, unreadCount: 0 });
+        convMap.set(otherId, {
+          user: msg.receiver,
+          lastMessage: msg,
+          unreadCount: 0,
+        });
       }
     }
 
@@ -39,7 +65,11 @@ export class ChatService {
       const otherId = msg.senderId;
       const existing = convMap.get(otherId);
       if (!existing || existing.lastMessage.createdAt < msg.createdAt) {
-        convMap.set(otherId, { user: msg.sender, lastMessage: msg, unreadCount: 0 });
+        convMap.set(otherId, {
+          user: msg.sender,
+          lastMessage: msg,
+          unreadCount: 0,
+        });
       }
     }
 
@@ -55,7 +85,8 @@ export class ChatService {
     }
 
     return Array.from(convMap.values()).sort(
-      (a, b) => b.lastMessage.createdAt.getTime() - a.lastMessage.createdAt.getTime(),
+      (a, b) =>
+        b.lastMessage.createdAt.getTime() - a.lastMessage.createdAt.getTime(),
     );
   }
 
@@ -71,7 +102,12 @@ export class ChatService {
     };
 
     const [messages, total] = await Promise.all([
-      this.prisma.chat.findMany({ where, orderBy: { createdAt: 'asc' }, skip, take: limit }),
+      this.prisma.chat.findMany({
+        where,
+        orderBy: { createdAt: 'asc' },
+        skip,
+        take: limit,
+      }),
       this.prisma.chat.count({ where }),
     ]);
 
@@ -90,7 +126,9 @@ export class ChatService {
   }
 
   async sendMessage(senderId: string, dto: SendMessageDto) {
-    const receiver = await this.prisma.user.findUnique({ where: { id: dto.receiverId } });
+    const receiver = await this.prisma.user.findUnique({
+      where: { id: dto.receiverId },
+    });
     if (!receiver) throw new NotFoundException('User not found');
 
     const message = await this.prisma.chat.create({
@@ -101,7 +139,9 @@ export class ChatService {
         type: dto.type ?? ChatType.TEXT,
       },
       include: {
-        sender: { select: { id: true, username: true, displayName: true, avatar: true } },
+        sender: {
+          select: { id: true, username: true, displayName: true, avatar: true },
+        },
       },
     });
 
@@ -117,9 +157,12 @@ export class ChatService {
   }
 
   async deleteMessage(userId: string, messageId: string) {
-    const message = await this.prisma.chat.findUnique({ where: { id: messageId } });
+    const message = await this.prisma.chat.findUnique({
+      where: { id: messageId },
+    });
     if (!message) throw new NotFoundException('Message not found');
-    if (message.senderId !== userId) throw new ForbiddenException('Cannot delete this message');
+    if (message.senderId !== userId)
+      throw new ForbiddenException('Cannot delete this message');
 
     await this.prisma.chat.update({
       where: { id: messageId },

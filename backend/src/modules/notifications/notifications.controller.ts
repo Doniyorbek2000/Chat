@@ -1,6 +1,11 @@
 import {
-  Controller, Get, Patch, Delete,
-  Param, Query, UseGuards,
+  Controller,
+  Get,
+  Patch,
+  Delete,
+  Param,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { GetNotificationsDto } from './dto/notification.dto';
@@ -13,8 +18,15 @@ export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
   @Get()
-  async getNotifications(@CurrentUser() user: any, @Query() query: GetNotificationsDto) {
-    const data = await this.notificationsService.getNotifications(user.id, query.page, query.limit);
+  async getNotifications(
+    @CurrentUser() user: any,
+    @Query() query: GetNotificationsDto,
+  ) {
+    const data = await this.notificationsService.getNotifications(
+      user.id,
+      query.page,
+      query.limit,
+    );
     return { success: true, data };
   }
 
@@ -38,7 +50,10 @@ export class NotificationsController {
 
   @Delete(':id')
   async deleteNotification(@CurrentUser() user: any, @Param('id') id: string) {
-    const data = await this.notificationsService.deleteNotification(user.id, id);
+    const data = await this.notificationsService.deleteNotification(
+      user.id,
+      id,
+    );
     return { success: true, data };
   }
 }

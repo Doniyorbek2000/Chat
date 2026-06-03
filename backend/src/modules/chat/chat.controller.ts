@@ -1,6 +1,13 @@
 import {
-  Controller, Get, Post, Patch, Delete,
-  Param, Body, Query, UseGuards,
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Param,
+  Body,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { SendMessageDto, GetMessagesDto } from './dto/chat.dto';
@@ -24,7 +31,12 @@ export class ChatController {
     @Param('userId') otherUserId: string,
     @Query() query: GetMessagesDto,
   ) {
-    const data = await this.chatService.getMessages(user.id, otherUserId, query.page, query.limit);
+    const data = await this.chatService.getMessages(
+      user.id,
+      otherUserId,
+      query.page,
+      query.limit,
+    );
     return { success: true, data };
   }
 
@@ -35,13 +47,19 @@ export class ChatController {
   }
 
   @Patch('messages/:userId/read')
-  async markAsRead(@CurrentUser() user: any, @Param('userId') otherUserId: string) {
+  async markAsRead(
+    @CurrentUser() user: any,
+    @Param('userId') otherUserId: string,
+  ) {
     const data = await this.chatService.markAsRead(user.id, otherUserId);
     return { success: true, data };
   }
 
   @Delete('messages/:messageId')
-  async deleteMessage(@CurrentUser() user: any, @Param('messageId') messageId: string) {
+  async deleteMessage(
+    @CurrentUser() user: any,
+    @Param('messageId') messageId: string,
+  ) {
     const data = await this.chatService.deleteMessage(user.id, messageId);
     return { success: true, data };
   }

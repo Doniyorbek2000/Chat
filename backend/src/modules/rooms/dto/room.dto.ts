@@ -68,6 +68,17 @@ export class CreateRoomDto {
   @IsOptional()
   @IsString()
   familyId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  coverImage?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  announcement?: string;
 }
 
 export class UpdateRoomDto {

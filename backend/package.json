@@ -21,7 +21,23 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "prisma:seed": "ts-node prisma/seed.ts"
+    "prisma:seed": "ts-node prisma/seed.ts",
+    "db:seed": "prisma db seed"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "@prisma/client",
+      "@prisma/engines",
+      "bcrypt",
+      "msgpackr-extract",
+      "prisma",
+      "protobufjs",
+      "sharp"
+    ]
   },
   "dependencies": {
     "@nestjs/common": "^10.3.0",
@@ -62,8 +78,7 @@
     "sharp": "^0.33.2",
     "firebase-admin": "^12.0.0",
     "@nestjs-modules/ioredis": "^2.0.2",
-    "google-auth-library": "^9.4.1",
-    "dumb-init": "^1.2.5"
+    "google-auth-library": "^9.4.1"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.3.0",

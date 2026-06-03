@@ -87,10 +87,7 @@ export class AdminController {
   }
 
   @Delete('users/:id/ban')
-  unbanUser(
-    @CurrentUser('id') adminId: string,
-    @Param('id') userId: string,
-  ) {
+  unbanUser(@CurrentUser('id') adminId: string, @Param('id') userId: string) {
     return this.adminService.unbanUser(adminId, userId);
   }
 

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { WalletService } from '../wallet/wallet.service';
 
@@ -52,7 +56,9 @@ export class EventsService {
   }
 
   async getEventLeaderboard(eventId: string, page = 1, limit = 50) {
-    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+    });
     if (!event) throw new NotFoundException('Event not found');
 
     // Get top gifters during event period
@@ -71,14 +77,22 @@ export class EventsService {
   }
 
   async claimEventReward(userId: string, eventId: string) {
-    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+    });
     if (!event) throw new NotFoundException('Event not found');
     if (!event.isActive) throw new BadRequestException('Event is not active');
 
     const rewards = event.rewards as any;
-    if (!rewards?.participation) throw new BadRequestException('No rewards available');
+    if (!rewards?.participation)
+      throw new BadRequestException('No rewards available');
 
-    await this.wallet.addCoins(userId, rewards.participation.coins || 100, `Event reward: ${event.name}`, eventId);
+    await this.wallet.addCoins(
+      userId,
+      rewards.participation.coins || 100,
+      `Event reward: ${event.name}`,
+      eventId,
+    );
     return { message: 'Reward claimed', reward: rewards.participation };
   }
 }

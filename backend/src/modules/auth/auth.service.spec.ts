@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../../prisma/prisma.service';
-import { getRedisToken } from '@nestjs-modules/ioredis';
+
 
 // ==================== MOCKS ====================
 
@@ -79,7 +79,7 @@ describe('AuthService', () => {
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: mockConfigService },
-        { provide: getRedisToken('default'), useValue: mockRedis },
+        { provide: 'default_IORedisModuleConnectionToken', useValue: mockRedis },
       ],
     }).compile();
 
@@ -170,7 +170,11 @@ describe('AuthService', () => {
         .mockResolvedValueOnce('refresh-token-456');
       mockRedis.set.mockResolvedValue('OK');
 
-      const result = await service.verifyOtp('+998901234567', '123456', 'device-001');
+      const result = await service.verifyOtp(
+        '+998901234567',
+        '123456',
+        'device-001',
+      );
 
       expect(result).toHaveProperty('user');
       expect(result).toHaveProperty('accessToken');

@@ -44,7 +44,7 @@ export default function Header({ title, subtitle }: HeaderProps) {
     router.push('/login')
   }
 
-  const user = session?.user
+  const user = session?.user as ({ name?: string | null; email?: string | null; image?: string | null; role?: string }) | undefined
   const roleColors: Record<string, string> = {
     super_admin: 'text-amber-400 bg-amber-500/20',
     admin: 'text-primary-400 bg-primary-500/20',

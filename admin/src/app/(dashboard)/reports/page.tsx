@@ -17,7 +17,8 @@ import { formatDateTime, timeAgo } from '@/lib/utils'
 import type { Report } from '@/types'
 import toast from 'react-hot-toast'
 
-const columnHelper = createColumnHelper<Report>()
+type ReportRow = Report & { previousReports: number }
+const columnHelper = createColumnHelper<ReportRow>()
 
 type ReportTab = 'pending' | 'reviewing' | 'resolved'
 

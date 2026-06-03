@@ -476,7 +476,7 @@ model Family {
   level           Int      @default(1)
   xp              BigInt   @default(0)
   treasury        BigInt   @default(0)
-  ownerId         String
+  ownerId         String   @unique
   isPublic        Boolean  @default(true)
   requireApproval Boolean  @default(false)
   maxMembers      Int      @default(50)
@@ -489,8 +489,6 @@ model Family {
   rooms   VoiceRoom[]
   battlesAsChallenger FamilyBattle[] @relation("FamilyChallenger")
   battlesAsDefender   FamilyBattle[] @relation("FamilyDefender")
-
-  @@index([ownerId])
   @@index([country])
   @@map("families")
 }

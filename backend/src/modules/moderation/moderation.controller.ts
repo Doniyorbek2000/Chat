@@ -1,8 +1,21 @@
 import {
-  Controller, Post, Get, Delete, Param, Body, Query, UseGuards,
+  Controller,
+  Post,
+  Get,
+  Delete,
+  Param,
+  Body,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ModerationService } from './moderation.service';
-import { ReportUserDto, BanUserDto, MuteUserDto, ResolveReportDto, GetReportsDto } from './dto/moderation.dto';
+import {
+  ReportUserDto,
+  BanUserDto,
+  MuteUserDto,
+  ResolveReportDto,
+  GetReportsDto,
+} from './dto/moderation.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -29,7 +42,11 @@ export class ModerationController {
     @Param('id') reportId: string,
     @Body() dto: ResolveReportDto,
   ) {
-    const data = await this.moderationService.resolveReport(user.id, reportId, dto);
+    const data = await this.moderationService.resolveReport(
+      user.id,
+      reportId,
+      dto,
+    );
     return { success: true, data };
   }
 
@@ -57,7 +74,11 @@ export class ModerationController {
     @Param('userId') userId: string,
     @Query('roomId') roomId?: string,
   ) {
-    const data = await this.moderationService.unmuteUser(user.id, userId, roomId);
+    const data = await this.moderationService.unmuteUser(
+      user.id,
+      userId,
+      roomId,
+    );
     return { success: true, data };
   }
 
