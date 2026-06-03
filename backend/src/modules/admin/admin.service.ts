@@ -472,6 +472,117 @@ export class AdminService {
     };
   }
 
+  // ==================== REVENUE ====================
+
+  async getRevenueSummary(startDate?: string, endDate?: string) {
+    const start = startDate ? new Date(startDate) : dayjs().subtract(30, 'day').toDate();
+    const end = endDate ? new Date(endDate) : new Date();
+    const today = dayjs().startOf('day').toDate();
+    const weekStart = dayjs().startOf('week').toDate();
+    const monthStart = dayjs().startOf('month').toDate();
+
+    const [total, todayRevenue, weekRevenue, monthRevenue, pendingWithdrawals, paymentBreakdown] =
+      await Promise.all([
+        this.prisma.transaction.aggregate({
+          where: { type: 'RECHARGE', status: 'COMPLETED', createdAt: { gte: start, lte: end } },
+          _sum: { amount: true },
+          _count: true,
+        }),
+        this.prisma.transaction.aggregate({
+          where: { type: 'RECHARGE', status: 'COMPLETED', createdAt: { gte: today } },
+          _sum: { amount: true },
+        }),
+        this.prisma.transaction.aggregate({
+          where: { type: 'RECHARGE', status: 'COMPLETED', createdAt: { gte: weekStart } },
+          _sum: { amount: true },
+        }),
+        this.prisma.transaction.aggregate({
+          where: { type: 'RECHARGE', status: 'COMPLETED', createdAt: { gte: monthStart } },
+          _sum: { amount: true },
+        }),
+        this.prisma.withdrawal.aggregate({
+          where: { status: 'PENDING' },
+          _sum: { amount: true },
+          _count: true,
+        }),
+        this.prisma.transaction.groupBy({
+          by: ['referenceType'],
+          where: { type: 'RECHARGE', status: 'COMPLETED', createdAt: { gte: start, lte: end } },
+          _sum: { amount: true },
+          _count: true,
+        }),
+      ]);
+
+    return {
+      total: Number(total._sum.amount || 0),
+      totalTransactions: total._count,
+      today: Number(todayRevenue._sum.amount || 0),
+      thisWeek: Number(weekRevenue._sum.amount || 0),
+      thisMonth: Number(monthRevenue._sum.amount || 0),
+      pendingWithdrawals: Number(pendingWithdrawals._sum.amount || 0),
+      pendingWithdrawalCount: pendingWithdrawals._count,
+      paymentBreakdown: paymentBreakdown.map((p) => ({
+        provider: p.referenceType || 'unknown',
+        total: Number(p._sum.amount || 0),
+        count: p._count,
+      })),
+    };
+  }
+
+  async getRevenueChart(period: 'daily' | 'weekly' | 'monthly' = 'daily', days = 30) {
+    const start = dayjs().subtract(days, 'day').startOf('day').toDate();
+
+    const transactions = await this.prisma.transaction.findMany({
+      where: { type: 'RECHARGE', status: 'COMPLETED', createdAt: { gte: start } },
+      select: { amount: true, createdAt: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // Group by day
+    const grouped = new Map<string, { revenue: number; count: number }>();
+    for (let i = 0; i < days; i++) {
+      const key = dayjs().subtract(i, 'day').format('YYYY-MM-DD');
+      grouped.set(key, { revenue: 0, count: 0 });
+    }
+
+    for (const tx of transactions) {
+      const key = dayjs(tx.createdAt).format('YYYY-MM-DD');
+      const existing = grouped.get(key);
+      if (existing) {
+        existing.revenue += Number(tx.amount);
+        existing.count += 1;
+      }
+    }
+
+    return Array.from(grouped.entries())
+      .map(([date, data]) => ({ date, ...data }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  async getTopRechargedUsers(limit = 20) {
+    const topUsers = await this.prisma.transaction.groupBy({
+      by: ['userId'],
+      where: { type: 'RECHARGE', status: 'COMPLETED' },
+      _sum: { amount: true },
+      _count: true,
+      orderBy: { _sum: { amount: 'desc' } },
+      take: limit,
+    });
+
+    const userIds = topUsers.map((u) => u.userId);
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, uid: true, username: true, displayName: true, avatar: true, vipLevel: true },
+    });
+    const userMap = Object.fromEntries(users.map((u) => [u.id, u]));
+
+    return topUsers.map((row) => ({
+      user: userMap[row.userId] || { id: row.userId },
+      totalRecharge: Number(row._sum.amount || 0),
+      transactionCount: row._count,
+    }));
+  }
+
   // ==================== HELPERS ====================
 
   private async createAuditLog(

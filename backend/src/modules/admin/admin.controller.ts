@@ -144,6 +144,31 @@ export class AdminController {
     return this.adminService.toggleGiftStatus(giftId);
   }
 
+  // ==================== REVENUE ====================
+
+  @Get('revenue/summary')
+  getRevenueSummary(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.adminService.getRevenueSummary(startDate, endDate);
+  }
+
+  @Get('revenue/chart')
+  getRevenueChart(
+    @Query('period') period: 'daily' | 'weekly' | 'monthly' = 'daily',
+    @Query('days', new DefaultValuePipe(30), ParseIntPipe) days = 30,
+  ) {
+    return this.adminService.getRevenueChart(period, days);
+  }
+
+  @Get('revenue/top-users')
+  getTopRechargedUsers(
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit = 20,
+  ) {
+    return this.adminService.getTopRechargedUsers(limit);
+  }
+
   // ==================== NOTIFICATIONS ====================
 
   @Post('notifications/broadcast')
