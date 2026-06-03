@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   S3Client,
@@ -8,6 +8,9 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { v4 as uuidv4 } from 'uuid';
+
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const DEFAULT_MAX_SIZE_MB = 5;
 
 @Injectable()
 export class StorageService {
@@ -29,6 +32,23 @@ export class StorageService {
       },
       forcePathStyle: true,
     });
+  }
+
+  private validateImageFile(buffer: Buffer, contentType: string): void {
+    const maxBytes =
+      (this.configService.get<number>('upload.maxSizeMb') ?? DEFAULT_MAX_SIZE_MB) * 1024 * 1024;
+
+    if (!ALLOWED_IMAGE_TYPES.includes(contentType)) {
+      throw new BadRequestException(
+        `File type "${contentType}" is not allowed. Allowed types: ${ALLOWED_IMAGE_TYPES.join(', ')}`,
+      );
+    }
+
+    if (buffer.length > maxBytes) {
+      throw new BadRequestException(
+        `File size ${(buffer.length / 1024 / 1024).toFixed(1)}MB exceeds the ${DEFAULT_MAX_SIZE_MB}MB limit`,
+      );
+    }
   }
 
   async uploadFile(
@@ -88,10 +108,13 @@ export class StorageService {
     buffer: Buffer,
     userId: string,
     originalName: string,
+    contentType?: string,
   ): Promise<string> {
+    const mimeType = contentType || `image/${originalName.split('.').pop() || 'jpeg'}`;
+    this.validateImageFile(buffer, mimeType);
     const ext = originalName.split('.').pop() || 'jpg';
     const key = `avatars/${userId}/${uuidv4()}.${ext}`;
-    return this.uploadFile(buffer, key, `image/${ext}`);
+    return this.uploadFile(buffer, key, mimeType);
   }
 
   async uploadGiftAnimation(
@@ -120,9 +143,12 @@ export class StorageService {
     buffer: Buffer,
     roomId: string,
     originalName: string,
+    contentType?: string,
   ): Promise<string> {
+    const mimeType = contentType || `image/${originalName.split('.').pop() || 'jpeg'}`;
+    this.validateImageFile(buffer, mimeType);
     const ext = originalName.split('.').pop() || 'jpg';
     const key = `rooms/${roomId}/cover.${ext}`;
-    return this.uploadFile(buffer, key, `image/${ext}`);
+    return this.uploadFile(buffer, key, mimeType);
   }
 }

@@ -248,6 +248,7 @@ model User {
   frames               UserFrame[]
   resolvedReports      Report[]              @relation("ReportResolver")
   processedWithdrawals Withdrawal[]          @relation("WithdrawalProcessor")
+  auditLogs            AuditLog[]            @relation("AdminAuditLogs")
 
   @@index([phone])
   @@index([email])
@@ -277,19 +278,20 @@ model Wallet {
 }
 
 model Transaction {
-  id            String            @id @default(cuid())
-  userId        String
-  type          TransactionType
-  currency      Currency
-  amount        BigInt
-  balanceBefore BigInt
-  balanceAfter  BigInt
-  referenceId   String?
-  referenceType String?
-  description   String?
-  status        TransactionStatus @default(COMPLETED)
-  metadata      Json?
-  createdAt     DateTime          @default(now())
+  id              String            @id @default(cuid())
+  userId          String
+  type            TransactionType
+  currency        Currency
+  amount          BigInt
+  balanceBefore   BigInt
+  balanceAfter    BigInt
+  referenceId     String?
+  referenceType   String?
+  description     String?
+  status          TransactionStatus @default(COMPLETED)
+  metadata        Json?
+  googlePlayToken String?           @unique
+  createdAt       DateTime          @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -933,13 +935,15 @@ model UserFrame {
 
 model AuditLog {
   id         String   @id @default(cuid())
-  adminId    String
+  adminId    String?
   action     String
   targetType String
   targetId   String
   details    Json?
   ipAddress  String?
   createdAt  DateTime @default(now())
+
+  admin User? @relation("AdminAuditLogs", fields: [adminId], references: [id], onDelete: SetNull)
 
   @@index([adminId])
   @@index([targetType, targetId])

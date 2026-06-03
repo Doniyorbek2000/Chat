@@ -242,6 +242,13 @@ export class RoomsGateway
       const userId = client.userId;
       if (!userId) throw new WsException('Unauthorized');
 
+      // Verify user is a member of this room (joined via room:join)
+      const isMember = await this.redis.sismember(`room_users:${data.roomId}`, userId);
+      if (!isMember) {
+        client.emit('error', { message: 'You must join the room before taking a seat' });
+        return;
+      }
+
       const seat = await this.prisma.roomSeat.findUnique({
         where: {
           roomId_position: { roomId: data.roomId, position: data.position },

@@ -249,9 +249,9 @@ export class PaymentsService {
       );
     }
 
-    // Check for duplicate
-    const existing = await this.prisma.transaction.findFirst({
-      where: { metadata: { path: ['googlePlayToken'], equals: token } },
+    // Check for duplicate using unique index on googlePlayToken field
+    const existing = await this.prisma.transaction.findUnique({
+      where: { googlePlayToken: token },
     });
     if (existing) return { success: true, alreadyProcessed: true };
 
@@ -283,7 +283,8 @@ export class PaymentsService {
       balanceAfter: BigInt(0),
       status: TransactionStatus.COMPLETED,
       description: `Google Play: ${productId}`,
-      metadata: { googlePlayToken: token, productId, packageName },
+      googlePlayToken: token,
+      metadata: { productId, packageName },
     };
 
     await this.prisma.transaction.create({ data: txData });

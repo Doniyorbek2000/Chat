@@ -120,33 +120,43 @@ export class WalletService {
     description: string,
     referenceId?: string,
   ) {
-    const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
-    const before = wallet?.diamonds || 0;
+    const lockKey = `wallet:diamonds:add:${userId}`;
+    const acquired = await this.redis.set(lockKey, '1', 'EX', 5, 'NX');
+    if (!acquired) {
+      throw new BadRequestException('Wallet operation in progress, please retry');
+    }
 
-    const [updated] = await this.prisma.$transaction([
-      this.prisma.wallet.update({
-        where: { userId },
-        data: {
-          diamonds: { increment: amount },
-          totalEarned: { increment: amount },
-        },
-      }),
-      this.prisma.transaction.create({
-        data: {
-          userId,
-          type: TransactionType.GIFT_RECEIVE,
-          currency: Currency.DIAMONDS,
-          amount,
-          balanceBefore: before,
-          balanceAfter: Number(before) + amount,
-          description,
-          referenceId,
-          status: TransactionStatus.COMPLETED,
-        },
-      }),
-    ]);
+    try {
+      const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
+      const before = wallet?.diamonds || 0;
 
-    return updated;
+      const [updated] = await this.prisma.$transaction([
+        this.prisma.wallet.update({
+          where: { userId },
+          data: {
+            diamonds: { increment: amount },
+            totalEarned: { increment: amount },
+          },
+        }),
+        this.prisma.transaction.create({
+          data: {
+            userId,
+            type: TransactionType.GIFT_RECEIVE,
+            currency: Currency.DIAMONDS,
+            amount,
+            balanceBefore: before,
+            balanceAfter: Number(before) + amount,
+            description,
+            referenceId,
+            status: TransactionStatus.COMPLETED,
+          },
+        }),
+      ]);
+
+      return updated;
+    } finally {
+      await this.redis.del(lockKey);
+    }
   }
 
   async deductDiamonds(userId: string, amount: number, description: string) {

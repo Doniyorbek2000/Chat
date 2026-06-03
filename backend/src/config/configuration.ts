@@ -68,4 +68,7 @@ export default () => ({
     ttl: parseInt(process.env.THROTTLE_TTL, 10) || 60000,
     limit: parseInt(process.env.THROTTLE_LIMIT, 10) || 100,
   },
+  upload: {
+    maxSizeMb: parseInt(process.env.UPLOAD_MAX_SIZE_MB, 10) || 5,
+  },
 });
