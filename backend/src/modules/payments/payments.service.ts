@@ -166,6 +166,66 @@ export class PaymentsService {
     }
   }
 
+  async verifyGooglePlayPurchase(userId: string, dto: { token: string; productId: string; packageName: string }) {
+    const { token, productId, packageName } = dto;
+
+    // In production: use Google Play Developer API to verify
+    // POST https://www.googleapis.com/androidpublisher/v3/applications/{packageName}/purchases/products/{productId}/tokens/{token}
+    // For now: dev mode accepts all purchases and credits wallet
+
+    const isDev = this.config.get<string>('app.env') !== 'production';
+
+    if (!isDev) {
+      // Production verification would go here:
+      // const auth = new google.auth.GoogleAuth({ scopes: ['https://www.googleapis.com/auth/androidpublisher'] });
+      // const androidPublisher = google.androidpublisher({ version: 'v3', auth });
+      // const result = await androidPublisher.purchases.products.get({ packageName, productId, token });
+      // if (result.data.purchaseState !== 0) throw new BadRequestException('Purchase not valid');
+      throw new BadRequestException('Google Play verification not configured in production');
+    }
+
+    // Check for duplicate
+    const existing = await this.prisma.transaction.findFirst({
+      where: { metadata: { path: ['googlePlayToken'], equals: token } },
+    });
+    if (existing) return { success: true, alreadyProcessed: true };
+
+    // Map product ID to reward
+    const productRewards: Record<string, { coins?: number; diamonds?: number; vipLevel?: number; vipDays?: number }> = {
+      'voxo_coins_small':     { coins: 100 },
+      'voxo_coins_medium':    { coins: 500 },
+      'voxo_coins_large':     { coins: 1000 },
+      'voxo_diamonds_small':  { diamonds: 50 },
+      'voxo_diamonds_medium': { diamonds: 200 },
+      'voxo_diamonds_large':  { diamonds: 500 },
+      'voxo_vip_1_month':     { vipLevel: 1, vipDays: 30 },
+      'voxo_vip_3_month':     { vipLevel: 1, vipDays: 90 },
+      'voxo_vip_12_month':    { vipLevel: 1, vipDays: 365 },
+    };
+
+    const reward = productRewards[productId];
+    if (!reward) throw new BadRequestException(`Unknown product: ${productId}`);
+
+    const txData = {
+      userId,
+      type: TransactionType.RECHARGE,
+      currency: reward.diamonds ? Currency.DIAMONDS : Currency.COINS,
+      amount: BigInt(reward.coins ?? reward.diamonds ?? 0),
+      balanceBefore: BigInt(0),
+      balanceAfter: BigInt(0),
+      status: TransactionStatus.COMPLETED,
+      description: `Google Play: ${productId}`,
+      metadata: { googlePlayToken: token, productId, packageName },
+    };
+
+    await this.prisma.transaction.create({ data: txData });
+
+    if (reward.coins) await this.walletService.addCoins(userId, reward.coins, `Google Play: ${productId}`);
+    if (reward.diamonds) await this.walletService.addDiamonds(userId, reward.diamonds, `Google Play: ${productId}`);
+
+    return { success: true, reward };
+  }
+
   async getTransactionHistory(userId: string, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
     const [items, total] = await Promise.all([
