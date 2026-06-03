@@ -44,9 +44,9 @@ export class PaymentsService {
     });
 
     let paymentUrl: string;
-    const serviceId = this.config.get<string>('payments.clickServiceId') || '12345';
-    const merchantId = this.config.get<string>('payments.clickMerchantId') || '67890';
-    const paymeKey = this.config.get<string>('payments.paymeKey') || 'paymekey';
+    const serviceId = this.config.get<string>('click.serviceId') || '12345';
+    const merchantId = this.config.get<string>('click.merchantId') || '67890';
+    const paymeKey = this.config.get<string>('payme.key') || 'paymekey';
 
     if (dto.provider === PaymentProvider.CLICK) {
       paymentUrl = `https://my.click.uz/services/pay?service_id=${serviceId}&merchant_id=${merchantId}&amount=${dto.amount}&transaction_param=${transaction.id}&return_url=voxo://payment`;
@@ -62,7 +62,7 @@ export class PaymentsService {
   }
 
   async handleClickPrepare(dto: ClickPrepareDto) {
-    const secretKey = this.config.get<string>('payments.clickSecretKey') || 'secret';
+    const secretKey = this.config.get<string>('click.secretKey') || 'secret';
     const expectedSign = crypto
       .createHash('md5')
       .update(`${dto.click_trans_id}${dto.service_id}${secretKey}${dto.merchant_trans_id}${dto.amount}${dto.action}${dto.sign_time}`)
@@ -89,7 +89,7 @@ export class PaymentsService {
   }
 
   async handleClickComplete(dto: ClickCompleteDto) {
-    const secretKey = this.config.get<string>('payments.clickSecretKey') || 'secret';
+    const secretKey = this.config.get<string>('click.secretKey') || 'secret';
     const expectedSign = crypto
       .createHash('md5')
       .update(`${dto.click_trans_id}${dto.service_id}${secretKey}${dto.merchant_trans_id}${dto.merchant_prepare_id}${dto.amount}${dto.action}${dto.sign_time}`)
