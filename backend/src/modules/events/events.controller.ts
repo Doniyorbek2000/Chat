@@ -12,7 +12,9 @@ export class EventsController {
   constructor(private eventsService: EventsService) {}
 
   @Get()
-  getActiveEvents() {
+  getEvents(@Query('status') status?: string) {
+    if (status === 'upcoming') return this.eventsService.getUpcomingEvents();
+    if (status === 'completed') return this.eventsService.getCompletedEvents();
     return this.eventsService.getActiveEvents();
   }
 

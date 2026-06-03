@@ -21,6 +21,22 @@ export class EventsService {
     return this.prisma.event.findMany({ orderBy: { createdAt: 'desc' } });
   }
 
+  async getUpcomingEvents() {
+    const now = new Date();
+    return this.prisma.event.findMany({
+      where: { startDate: { gt: now } },
+      orderBy: { startDate: 'asc' },
+    });
+  }
+
+  async getCompletedEvents() {
+    const now = new Date();
+    return this.prisma.event.findMany({
+      where: { endDate: { lt: now } },
+      orderBy: { endDate: 'desc' },
+    });
+  }
+
   async getEvent(id: string) {
     const event = await this.prisma.event.findUnique({ where: { id } });
     if (!event) throw new NotFoundException('Event not found');
