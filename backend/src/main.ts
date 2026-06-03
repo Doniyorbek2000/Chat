@@ -6,7 +6,7 @@ import { IoAdapter } from '@nestjs/platform-socket.io';
 import * as compression from 'compression';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 
 async function bootstrap() {
@@ -43,7 +43,7 @@ async function bootstrap() {
   );
 
   // Global filters and interceptors
-  app.useGlobalFilters(new HttpExceptionFilter());
+  app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalInterceptors(new ResponseInterceptor());
 
   // WebSocket adapter

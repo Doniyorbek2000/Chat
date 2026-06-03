@@ -49,7 +49,9 @@ export class RoomsGateway
     private configService: ConfigService,
     private prisma: PrismaService,
   ) {
-    this.redis = new Redis.Redis(this.configService.get<string>('redis.url') || 'redis://localhost:6379');
+    this.redis = new Redis.Redis(
+      this.configService.get<string>('redis.url') || 'redis://localhost:6379',
+    );
   }
 
   afterInit(server: Server) {
@@ -118,10 +120,12 @@ export class RoomsGateway
       this.socketUserMap.delete(client.id);
 
       await this.redis.hdel('online_users', userId);
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: { isOnline: false, lastSeen: new Date() },
-      }).catch(() => {});
+      await this.prisma.user
+        .update({
+          where: { id: userId },
+          data: { isOnline: false, lastSeen: new Date() },
+        })
+        .catch(() => {});
 
       // Leave all rooms
       const rooms = await this.redis.smembers(`user_rooms:${userId}`);
@@ -150,13 +154,25 @@ export class RoomsGateway
           seats: {
             include: {
               user: {
-                select: { id: true, uid: true, displayName: true, avatar: true, isVip: true },
+                select: {
+                  id: true,
+                  uid: true,
+                  displayName: true,
+                  avatar: true,
+                  isVip: true,
+                },
               },
             },
             orderBy: { position: 'asc' },
           },
           host: {
-            select: { id: true, uid: true, displayName: true, avatar: true, isVip: true },
+            select: {
+              id: true,
+              uid: true,
+              displayName: true,
+              avatar: true,
+              isVip: true,
+            },
           },
         },
       });
@@ -227,7 +243,9 @@ export class RoomsGateway
       if (!userId) throw new WsException('Unauthorized');
 
       const seat = await this.prisma.roomSeat.findUnique({
-        where: { roomId_position: { roomId: data.roomId, position: data.position } },
+        where: {
+          roomId_position: { roomId: data.roomId, position: data.position },
+        },
       });
 
       if (!seat || seat.isLocked) {
@@ -252,11 +270,19 @@ export class RoomsGateway
       }
 
       const updatedSeat = await this.prisma.roomSeat.update({
-        where: { roomId_position: { roomId: data.roomId, position: data.position } },
+        where: {
+          roomId_position: { roomId: data.roomId, position: data.position },
+        },
         data: { userId, joinedAt: new Date() },
         include: {
           user: {
-            select: { id: true, uid: true, displayName: true, avatar: true, isVip: true },
+            select: {
+              id: true,
+              uid: true,
+              displayName: true,
+              avatar: true,
+              isVip: true,
+            },
           },
         },
       });
@@ -341,7 +367,8 @@ export class RoomsGateway
   @SubscribeMessage('room:gift')
   async handleGift(
     @ConnectedSocket() client: AuthSocket,
-    @MessageBody() data: {
+    @MessageBody()
+    data: {
       roomId: string;
       giftId: string;
       receiverId: string;
@@ -353,7 +380,9 @@ export class RoomsGateway
       const senderId = client.userId;
       if (!senderId) throw new WsException('Unauthorized');
 
-      const gift = await this.prisma.gift.findUnique({ where: { id: data.giftId } });
+      const gift = await this.prisma.gift.findUnique({
+        where: { id: data.giftId },
+      });
       if (!gift) {
         client.emit('error', { message: 'Gift not found' });
         return;
@@ -380,7 +409,8 @@ export class RoomsGateway
   @SubscribeMessage('room:pk_update')
   async handlePkUpdate(
     @ConnectedSocket() client: AuthSocket,
-    @MessageBody() data: {
+    @MessageBody()
+    data: {
       pkBattleId: string;
       roomId: string;
       score: number;
@@ -418,7 +448,9 @@ export class RoomsGateway
   ) {
     try {
       const userId = client.userId;
-      const room = await this.prisma.voiceRoom.findUnique({ where: { id: data.roomId } });
+      const room = await this.prisma.voiceRoom.findUnique({
+        where: { id: data.roomId },
+      });
 
       if (!room || room.hostId !== userId) {
         client.emit('error', { message: 'Unauthorized' });
@@ -442,7 +474,9 @@ export class RoomsGateway
   ) {
     try {
       const adminId = client.userId;
-      const room = await this.prisma.voiceRoom.findUnique({ where: { id: data.roomId } });
+      const room = await this.prisma.voiceRoom.findUnique({
+        where: { id: data.roomId },
+      });
 
       if (!room || room.hostId !== adminId) {
         client.emit('error', { message: 'Unauthorized' });
@@ -459,7 +493,9 @@ export class RoomsGateway
       });
 
       if (targetSocketId) {
-        const targetSocket = this.server.sockets.sockets.get(targetSocketId) as AuthSocket;
+        const targetSocket = this.server.sockets.sockets.get(
+          targetSocketId,
+        ) as AuthSocket;
         if (targetSocket) {
           await targetSocket.leave(`room:${data.roomId}`);
           targetSocket.emit('room:kicked', {
@@ -476,11 +512,14 @@ export class RoomsGateway
   @SubscribeMessage('room:mute')
   async handleMute(
     @ConnectedSocket() client: AuthSocket,
-    @MessageBody() data: { roomId: string; targetUserId: string; muted: boolean },
+    @MessageBody()
+    data: { roomId: string; targetUserId: string; muted: boolean },
   ) {
     try {
       const adminId = client.userId;
-      const room = await this.prisma.voiceRoom.findUnique({ where: { id: data.roomId } });
+      const room = await this.prisma.voiceRoom.findUnique({
+        where: { id: data.roomId },
+      });
 
       if (!room || room.hostId !== adminId) {
         client.emit('error', { message: 'Unauthorized' });
@@ -510,7 +549,9 @@ export class RoomsGateway
   ) {
     try {
       const userId = client.userId;
-      const room = await this.prisma.voiceRoom.findUnique({ where: { id: data.roomId } });
+      const room = await this.prisma.voiceRoom.findUnique({
+        where: { id: data.roomId },
+      });
 
       if (!room || room.hostId !== userId) {
         client.emit('error', { message: 'Unauthorized' });

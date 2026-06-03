@@ -26,9 +26,7 @@ export class AuthService {
     private configService: ConfigService,
     @InjectRedis() private redis: Redis,
   ) {
-    this.googleClient = new OAuth2Client(
-      configService.get('google.clientId'),
-    );
+    this.googleClient = new OAuth2Client(configService.get('google.clientId'));
   }
 
   private generateUid(): string {
@@ -70,7 +68,9 @@ export class AuthService {
 
     const attempts = await this.redis.get(`otp_attempts:${phone}`);
     if (attempts && parseInt(attempts) >= 5) {
-      throw new BadRequestException('Too many OTP requests. Please try again after 1 hour.');
+      throw new BadRequestException(
+        'Too many OTP requests. Please try again after 1 hour.',
+      );
     }
 
     await this.redis.set(key, otp, 'EX', 300);
@@ -148,7 +148,11 @@ export class AuthService {
     return { user, ...tokens };
   }
 
-  async loginWithGoogle(idToken: string, deviceId?: string, referralCode?: string) {
+  async loginWithGoogle(
+    idToken: string,
+    deviceId?: string,
+    referralCode?: string,
+  ) {
     let ticket;
     try {
       ticket = await this.googleClient.verifyIdToken({
@@ -247,7 +251,9 @@ export class AuthService {
         uid = this.generateUid();
       }
 
-      const displayName = [givenName, familyName].filter(Boolean).join(' ') || `User${uid.substring(4, 9)}`;
+      const displayName =
+        [givenName, familyName].filter(Boolean).join(' ') ||
+        `User${uid.substring(4, 9)}`;
       const userReferralCode = `VOXO${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
       user = await this.prisma.user.create({

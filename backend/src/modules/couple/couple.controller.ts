@@ -47,7 +47,11 @@ export class CoupleController {
     @CurrentUser('id') userId: string,
     @Body() dto: SendCoupleRequestDto,
   ) {
-    return this.coupleService.sendCoupleRequest(userId, dto.receiverId, dto.message);
+    return this.coupleService.sendCoupleRequest(
+      userId,
+      dto.receiverId,
+      dto.message,
+    );
   }
 
   @Post('request/:id/accept')

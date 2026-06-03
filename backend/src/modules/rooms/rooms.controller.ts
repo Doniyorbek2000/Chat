@@ -1,5 +1,13 @@
 import {
-  Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards,
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { RoomsService } from './rooms.service';
@@ -27,7 +35,13 @@ export class RoomsController {
     @Query('page') page = 1,
     @Query('limit') limit = 20,
   ) {
-    return this.roomsService.getRooms({ type, language, search, page: +page, limit: +limit });
+    return this.roomsService.getRooms({
+      type,
+      language,
+      search,
+      page: +page,
+      limit: +limit,
+    });
   }
 
   @Get(':id')
@@ -36,7 +50,11 @@ export class RoomsController {
   }
 
   @Put(':id')
-  updateRoom(@Param('id') id: string, @CurrentUser() user: any, @Body() dto: UpdateRoomDto) {
+  updateRoom(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() dto: UpdateRoomDto,
+  ) {
     return this.roomsService.updateRoom(id, user.id, dto);
   }
 
@@ -46,7 +64,11 @@ export class RoomsController {
   }
 
   @Post(':id/join')
-  joinRoom(@Param('id') id: string, @CurrentUser() user: any, @Body('password') password?: string) {
+  joinRoom(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body('password') password?: string,
+  ) {
     return this.roomsService.joinRoom(id, user.id, password);
   }
 
@@ -56,7 +78,11 @@ export class RoomsController {
   }
 
   @Post(':id/seats/:position/take')
-  takeSeat(@Param('id') id: string, @Param('position') position: string, @CurrentUser() user: any) {
+  takeSeat(
+    @Param('id') id: string,
+    @Param('position') position: string,
+    @CurrentUser() user: any,
+  ) {
     return this.roomsService.takeSeat(id, user.id, +position);
   }
 
@@ -66,32 +92,56 @@ export class RoomsController {
   }
 
   @Post(':id/mute/:userId')
-  muteUser(@Param('id') id: string, @Param('userId') targetId: string, @CurrentUser() user: any) {
+  muteUser(
+    @Param('id') id: string,
+    @Param('userId') targetId: string,
+    @CurrentUser() user: any,
+  ) {
     return this.roomsService.muteUser(id, user.id, targetId);
   }
 
   @Post(':id/unmute/:userId')
-  unmuteUser(@Param('id') id: string, @Param('userId') targetId: string, @CurrentUser() user: any) {
+  unmuteUser(
+    @Param('id') id: string,
+    @Param('userId') targetId: string,
+    @CurrentUser() user: any,
+  ) {
     return this.roomsService.unmuteUser(id, user.id, targetId);
   }
 
   @Post(':id/kick/:userId')
-  kickUser(@Param('id') id: string, @Param('userId') targetId: string, @CurrentUser() user: any) {
+  kickUser(
+    @Param('id') id: string,
+    @Param('userId') targetId: string,
+    @CurrentUser() user: any,
+  ) {
     return this.roomsService.kickUser(id, user.id, targetId);
   }
 
   @Post(':id/lock-seat/:position')
-  lockSeat(@Param('id') id: string, @Param('position') pos: string, @CurrentUser() user: any) {
+  lockSeat(
+    @Param('id') id: string,
+    @Param('position') pos: string,
+    @CurrentUser() user: any,
+  ) {
     return this.roomsService.lockSeat(id, user.id, +pos);
   }
 
   @Post(':id/announcement')
-  updateAnnouncement(@Param('id') id: string, @CurrentUser() user: any, @Body('announcement') text: string) {
+  updateAnnouncement(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body('announcement') text: string,
+  ) {
     return this.roomsService.updateAnnouncement(id, user.id, text);
   }
 
   @Get(':id/members')
-  getRoomMembers(@Param('id') id: string, @Query('page') page = 1, @Query('limit') limit = 50) {
+  getRoomMembers(
+    @Param('id') id: string,
+    @Query('page') page = 1,
+    @Query('limit') limit = 50,
+  ) {
     return this.roomsService.getRoomMembers(id, +page, +limit);
   }
 

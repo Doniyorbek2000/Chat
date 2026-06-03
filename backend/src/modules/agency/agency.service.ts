@@ -69,7 +69,9 @@ export class AgencyService {
         },
         members: {
           include: {
-            user: { select: { id: true, uid: true, displayName: true, avatar: true } },
+            user: {
+              select: { id: true, uid: true, displayName: true, avatar: true },
+            },
           },
         },
       },
@@ -85,7 +87,14 @@ export class AgencyService {
       where: { id },
       include: {
         owner: {
-          select: { id: true, uid: true, displayName: true, avatar: true, isVip: true, vipLevel: true },
+          select: {
+            id: true,
+            uid: true,
+            displayName: true,
+            avatar: true,
+            isVip: true,
+            vipLevel: true,
+          },
         },
         members: {
           include: {
@@ -149,7 +158,9 @@ export class AgencyService {
   // ==================== JOIN AGENCY ====================
 
   async joinAgency(userId: string, agencyId: string) {
-    const agency = await this.prisma.agency.findUnique({ where: { id: agencyId } });
+    const agency = await this.prisma.agency.findUnique({
+      where: { id: agencyId },
+    });
     if (!agency) throw new NotFoundException('Agency not found');
 
     // Check if already a member in any agency
@@ -168,7 +179,9 @@ export class AgencyService {
           role: AgencyMemberRole.MEMBER,
         },
         include: {
-          user: { select: { id: true, uid: true, displayName: true, avatar: true } },
+          user: {
+            select: { id: true, uid: true, displayName: true, avatar: true },
+          },
           agency: { select: { id: true, name: true, logo: true } },
         },
       }),
@@ -187,9 +200,12 @@ export class AgencyService {
     const membership = await this.prisma.agencyMember.findFirst({
       where: { agencyId, userId },
     });
-    if (!membership) throw new NotFoundException('You are not a member of this agency');
+    if (!membership)
+      throw new NotFoundException('You are not a member of this agency');
     if (membership.role === AgencyMemberRole.OWNER) {
-      throw new BadRequestException('Agency owner cannot leave. Transfer ownership or dissolve the agency.');
+      throw new BadRequestException(
+        'Agency owner cannot leave. Transfer ownership or dissolve the agency.',
+      );
     }
 
     await this.prisma.$transaction([
@@ -228,15 +244,13 @@ export class AgencyService {
 
     if (!agency) throw new NotFoundException('Agency not found');
 
-    const topEarners = agency.members
-      .slice(0, 10)
-      .map((m) => ({
-        userId: m.userId,
-        user: m.user,
-        totalEarnings: Number(m.totalEarnings),
-        commission: m.commission,
-        role: m.role,
-      }));
+    const topEarners = agency.members.slice(0, 10).map((m) => ({
+      userId: m.userId,
+      user: m.user,
+      totalEarnings: Number(m.totalEarnings),
+      commission: m.commission,
+      role: m.role,
+    }));
 
     return {
       agencyId,
@@ -290,7 +304,9 @@ export class AgencyService {
       if (!wallet || wallet.totalEarned <= BigInt(0)) continue;
 
       // Calculate commission (10% of member's total earned diamonds)
-      const commission = Math.floor(Number(wallet.totalEarned) * commissionRate);
+      const commission = Math.floor(
+        Number(wallet.totalEarned) * commissionRate,
+      );
       if (commission <= 0) continue;
 
       // Add commission to agency owner's wallet

@@ -31,10 +31,14 @@ export class ZegocloudService {
 
   constructor(private readonly configService: ConfigService) {
     this.appId = this.configService.get<number>('zegocloud.appId');
-    this.serverSecret = this.configService.get<string>('zegocloud.serverSecret');
+    this.serverSecret = this.configService.get<string>(
+      'zegocloud.serverSecret',
+    );
 
     if (!this.appId || !this.serverSecret) {
-      this.logger.warn('ZEGOCLOUD credentials not configured. Voice rooms will not function.');
+      this.logger.warn(
+        'ZEGOCLOUD credentials not configured. Voice rooms will not function.',
+      );
     }
 
     this.httpClient = axios.create({
@@ -73,7 +77,7 @@ export class ZegocloudService {
       expire_time: expireAt,
       nonce,
       privilege: {
-        1: privileges.loginRoom ? 1 : 0,    // LOGIN_ROOM
+        1: privileges.loginRoom ? 1 : 0, // LOGIN_ROOM
         2: privileges.publishStream ? 1 : 0, // PUBLISH_STREAM
       },
     };
@@ -147,17 +151,22 @@ export class ZegocloudService {
 
     try {
       const params = this.getApiParams();
-      const response = await this.httpClient.get('/room/v2/describeuserinroom', {
-        params: {
-          ...params,
-          RoomId: '',
-          PageIndex: page - 1,
-          PageSize: pageSize,
+      const response = await this.httpClient.get(
+        '/room/v2/describeuserinroom',
+        {
+          params: {
+            ...params,
+            RoomId: '',
+            PageIndex: page - 1,
+            PageSize: pageSize,
+          },
         },
-      });
+      );
 
       if (response.data.Code !== 0) {
-        this.logger.error(`ZEGOCLOUD getRoomList error: ${response.data.Message}`);
+        this.logger.error(
+          `ZEGOCLOUD getRoomList error: ${response.data.Message}`,
+        );
         return { rooms: [], total: 0 };
       }
 

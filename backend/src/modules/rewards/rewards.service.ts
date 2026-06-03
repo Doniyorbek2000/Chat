@@ -24,7 +24,9 @@ export class RewardsService {
     private wallet: WalletService,
     private config: ConfigService,
   ) {
-    this.redis = new Redis.Redis(this.config.get<string>('redis.url') || 'redis://localhost:6379');
+    this.redis = new Redis.Redis(
+      this.config.get<string>('redis.url') || 'redis://localhost:6379',
+    );
   }
 
   getDailyRewardSchedule() {
@@ -72,7 +74,8 @@ export class RewardsService {
     const claimedKey = `daily_reward:${userId}:${today}`;
 
     const alreadyClaimed = await this.redis.get(claimedKey);
-    if (alreadyClaimed) throw new BadRequestException('Daily reward already claimed today');
+    if (alreadyClaimed)
+      throw new BadRequestException('Daily reward already claimed today');
 
     const streakKey = `daily_streak:${userId}`;
     const lastClaimKey = `daily_last:${userId}`;
@@ -99,13 +102,26 @@ export class RewardsService {
 
     // Give rewards
     if (reward.coins > 0) {
-      await this.wallet.addCoins(userId, reward.coins, `Daily reward day ${dayInCycle}`);
+      await this.wallet.addCoins(
+        userId,
+        reward.coins,
+        `Daily reward day ${dayInCycle}`,
+      );
     }
     if (reward.diamonds > 0) {
-      await this.wallet.addDiamonds(userId, reward.diamonds, `Daily reward day ${dayInCycle}`);
+      await this.wallet.addDiamonds(
+        userId,
+        reward.diamonds,
+        `Daily reward day ${dayInCycle}`,
+      );
     }
 
-    return { reward, streak, day: dayInCycle, message: `Claimed! +${reward.coins} coins${reward.diamonds > 0 ? ` +${reward.diamonds} diamonds` : ''}` };
+    return {
+      reward,
+      streak,
+      day: dayInCycle,
+      message: `Claimed! +${reward.coins} coins${reward.diamonds > 0 ? ` +${reward.diamonds} diamonds` : ''}`,
+    };
   }
 
   async getStreakInfo(userId: string) {

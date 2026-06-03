@@ -50,7 +50,10 @@ export class CreateFamilyDto {
 export class UpdateFamilyDto extends PartialType(CreateFamilyDto) {}
 
 export class DonateTreasuryDto {
-  @ApiProperty({ example: 100, description: 'Amount of diamonds to donate (min 10)' })
+  @ApiProperty({
+    example: 100,
+    description: 'Amount of diamonds to donate (min 10)',
+  })
   @IsNumber()
   @Min(10)
   amount: number;
@@ -58,9 +61,17 @@ export class DonateTreasuryDto {
 
 export class PromoteMemberDto {
   @ApiProperty({
-    enum: [FamilyMemberRole.CO_OWNER, FamilyMemberRole.ADMIN, FamilyMemberRole.MEMBER],
+    enum: [
+      FamilyMemberRole.CO_OWNER,
+      FamilyMemberRole.ADMIN,
+      FamilyMemberRole.MEMBER,
+    ],
     description: 'New role to assign',
   })
-  @IsEnum([FamilyMemberRole.CO_OWNER, FamilyMemberRole.ADMIN, FamilyMemberRole.MEMBER])
+  @IsEnum([
+    FamilyMemberRole.CO_OWNER,
+    FamilyMemberRole.ADMIN,
+    FamilyMemberRole.MEMBER,
+  ])
   role: FamilyMemberRole;
 }

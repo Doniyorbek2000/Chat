@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import { Redis } from 'ioredis';
@@ -53,7 +50,15 @@ export class LeaderboardService {
       const userIds = entries.map((e) => e.member);
       const users = await this.prisma.user.findMany({
         where: { id: { in: userIds } },
-        select: { id: true, uid: true, displayName: true, avatar: true, isVip: true, vipLevel: true, level: true },
+        select: {
+          id: true,
+          uid: true,
+          displayName: true,
+          avatar: true,
+          isVip: true,
+          vipLevel: true,
+          level: true,
+        },
       });
       const userMap = new Map(users.map((u) => [u.id, u]));
       const total = await this.redis.zcard(key);
@@ -79,17 +84,27 @@ export class LeaderboardService {
         skip: (page - 1) * limit,
         take: limit,
       }),
-      this.prisma.giftTransaction.groupBy({
-        by: ['receiverId'],
-        _sum: { totalDiamonds: true },
-        where: { createdAt: { gte: dateFrom } },
-      }).then((r) => r.length),
+      this.prisma.giftTransaction
+        .groupBy({
+          by: ['receiverId'],
+          _sum: { totalDiamonds: true },
+          where: { createdAt: { gte: dateFrom } },
+        })
+        .then((r) => r.length),
     ]);
 
     const userIds = results.map((r) => r.receiverId);
     const users = await this.prisma.user.findMany({
       where: { id: { in: userIds } },
-      select: { id: true, uid: true, displayName: true, avatar: true, isVip: true, vipLevel: true, level: true },
+      select: {
+        id: true,
+        uid: true,
+        displayName: true,
+        avatar: true,
+        isVip: true,
+        vipLevel: true,
+        level: true,
+      },
     });
     const userMap = new Map(users.map((u) => [u.id, u]));
 
@@ -117,13 +132,25 @@ export class LeaderboardService {
       const roomIds = entries.map((e) => e.member);
       const rooms = await this.prisma.voiceRoom.findMany({
         where: { id: { in: roomIds } },
-        select: { id: true, title: true, coverImage: true, hostId: true, host: { select: { id: true, uid: true, displayName: true, avatar: true } } },
+        select: {
+          id: true,
+          title: true,
+          coverImage: true,
+          hostId: true,
+          host: {
+            select: { id: true, uid: true, displayName: true, avatar: true },
+          },
+        },
       });
       const roomMap = new Map(rooms.map((r) => [r.id, r]));
       const total = await this.redis.zcard(key);
 
       return {
-        data: entries.map((e, i) => ({ rank: start + i + 1, score: e.score, room: roomMap.get(e.member) })),
+        data: entries.map((e, i) => ({
+          rank: start + i + 1,
+          score: e.score,
+          room: roomMap.get(e.member),
+        })),
         meta: { total, page, limit, pages: Math.ceil(total / limit) },
       };
     }
@@ -139,11 +166,13 @@ export class LeaderboardService {
         skip: (page - 1) * limit,
         take: limit,
       }),
-      this.prisma.giftTransaction.groupBy({
-        by: ['roomId'],
-        _sum: { totalCoins: true },
-        where: { createdAt: { gte: dateFrom }, roomId: { not: null } },
-      }).then((r) => r.length),
+      this.prisma.giftTransaction
+        .groupBy({
+          by: ['roomId'],
+          _sum: { totalCoins: true },
+          where: { createdAt: { gte: dateFrom }, roomId: { not: null } },
+        })
+        .then((r) => r.length),
     ]);
 
     const roomIds = results.map((r) => r.roomId).filter(Boolean) as string[];
@@ -154,7 +183,9 @@ export class LeaderboardService {
         title: true,
         coverImage: true,
         hostId: true,
-        host: { select: { id: true, uid: true, displayName: true, avatar: true } },
+        host: {
+          select: { id: true, uid: true, displayName: true, avatar: true },
+        },
       },
     });
     const roomMap = new Map(rooms.map((r) => [r.id, r]));
@@ -183,13 +214,25 @@ export class LeaderboardService {
       const familyIds = entries.map((e) => e.member);
       const families = await this.prisma.family.findMany({
         where: { id: { in: familyIds } },
-        select: { id: true, name: true, tag: true, avatar: true, level: true, treasury: true, _count: { select: { members: true } } },
+        select: {
+          id: true,
+          name: true,
+          tag: true,
+          avatar: true,
+          level: true,
+          treasury: true,
+          _count: { select: { members: true } },
+        },
       });
       const familyMap = new Map(families.map((f) => [f.id, f]));
       const total = await this.redis.zcard(key);
 
       return {
-        data: entries.map((e, i) => ({ rank: start + i + 1, score: e.score, family: familyMap.get(e.member) })),
+        data: entries.map((e, i) => ({
+          rank: start + i + 1,
+          score: e.score,
+          family: familyMap.get(e.member),
+        })),
         meta: { total, page, limit, pages: Math.ceil(total / limit) },
       };
     }
@@ -208,7 +251,9 @@ export class LeaderboardService {
           level: true,
           xp: true,
           treasury: true,
-          owner: { select: { id: true, uid: true, displayName: true, avatar: true } },
+          owner: {
+            select: { id: true, uid: true, displayName: true, avatar: true },
+          },
           _count: { select: { members: true } },
         },
       }),
@@ -240,15 +285,23 @@ export class LeaderboardService {
       const couples = await this.prisma.couple.findMany({
         where: { id: { in: coupleIds } },
         include: {
-          user1: { select: { id: true, uid: true, displayName: true, avatar: true } },
-          user2: { select: { id: true, uid: true, displayName: true, avatar: true } },
+          user1: {
+            select: { id: true, uid: true, displayName: true, avatar: true },
+          },
+          user2: {
+            select: { id: true, uid: true, displayName: true, avatar: true },
+          },
         },
       });
       const coupleMap = new Map(couples.map((c) => [c.id, c]));
       const total = await this.redis.zcard(key);
 
       return {
-        data: entries.map((e, i) => ({ rank: start + i + 1, score: e.score, couple: coupleMap.get(e.member) })),
+        data: entries.map((e, i) => ({
+          rank: start + i + 1,
+          score: e.score,
+          couple: coupleMap.get(e.member),
+        })),
         meta: { total, page, limit, pages: Math.ceil(total / limit) },
       };
     }
@@ -261,8 +314,24 @@ export class LeaderboardService {
         skip: (page - 1) * limit,
         take: limit,
         include: {
-          user1: { select: { id: true, uid: true, displayName: true, avatar: true, isVip: true } },
-          user2: { select: { id: true, uid: true, displayName: true, avatar: true, isVip: true } },
+          user1: {
+            select: {
+              id: true,
+              uid: true,
+              displayName: true,
+              avatar: true,
+              isVip: true,
+            },
+          },
+          user2: {
+            select: {
+              id: true,
+              uid: true,
+              displayName: true,
+              avatar: true,
+              isVip: true,
+            },
+          },
         },
       }),
       this.prisma.couple.count({ where: { status: CoupleStatus.ACTIVE } }),
@@ -273,7 +342,9 @@ export class LeaderboardService {
         rank: (page - 1) * limit + i + 1,
         score: Number(c.xp),
         couple: c,
-        daysTogether: Math.floor((Date.now() - c.createdAt.getTime()) / (1000 * 60 * 60 * 24)),
+        daysTogether: Math.floor(
+          (Date.now() - c.createdAt.getTime()) / (1000 * 60 * 60 * 24),
+        ),
       })),
       meta: { total, page, limit, pages: Math.ceil(total / limit) },
     };
@@ -293,13 +364,25 @@ export class LeaderboardService {
       const userIds = entries.map((e) => e.member);
       const users = await this.prisma.user.findMany({
         where: { id: { in: userIds } },
-        select: { id: true, uid: true, displayName: true, avatar: true, isVip: true, vipLevel: true, level: true },
+        select: {
+          id: true,
+          uid: true,
+          displayName: true,
+          avatar: true,
+          isVip: true,
+          vipLevel: true,
+          level: true,
+        },
       });
       const userMap = new Map(users.map((u) => [u.id, u]));
       const total = await this.redis.zcard(key);
 
       return {
-        data: entries.map((e, i) => ({ rank: start + i + 1, score: e.score, user: userMap.get(e.member) })),
+        data: entries.map((e, i) => ({
+          rank: start + i + 1,
+          score: e.score,
+          user: userMap.get(e.member),
+        })),
         meta: { total, page, limit, pages: Math.ceil(total / limit) },
       };
     }
@@ -314,17 +397,27 @@ export class LeaderboardService {
         skip: (page - 1) * limit,
         take: limit,
       }),
-      this.prisma.giftTransaction.groupBy({
-        by: ['senderId'],
-        _sum: { totalCoins: true },
-        where: { createdAt: { gte: dateFrom } },
-      }).then((r) => r.length),
+      this.prisma.giftTransaction
+        .groupBy({
+          by: ['senderId'],
+          _sum: { totalCoins: true },
+          where: { createdAt: { gte: dateFrom } },
+        })
+        .then((r) => r.length),
     ]);
 
     const userIds = results.map((r) => r.senderId);
     const users = await this.prisma.user.findMany({
       where: { id: { in: userIds } },
-      select: { id: true, uid: true, displayName: true, avatar: true, isVip: true, vipLevel: true, level: true },
+      select: {
+        id: true,
+        uid: true,
+        displayName: true,
+        avatar: true,
+        isVip: true,
+        vipLevel: true,
+        level: true,
+      },
     });
     const userMap = new Map(users.map((u) => [u.id, u]));
 
@@ -352,13 +445,24 @@ export class LeaderboardService {
       const userIds = entries.map((e) => e.member);
       const users = await this.prisma.user.findMany({
         where: { id: { in: userIds } },
-        select: { id: true, uid: true, displayName: true, avatar: true, isVip: true, vipLevel: true },
+        select: {
+          id: true,
+          uid: true,
+          displayName: true,
+          avatar: true,
+          isVip: true,
+          vipLevel: true,
+        },
       });
       const userMap = new Map(users.map((u) => [u.id, u]));
       const total = await this.redis.zcard(key);
 
       return {
-        data: entries.map((e, i) => ({ rank: start + i + 1, score: e.score, user: userMap.get(e.member) })),
+        data: entries.map((e, i) => ({
+          rank: start + i + 1,
+          score: e.score,
+          user: userMap.get(e.member),
+        })),
         meta: { total, page, limit, pages: Math.ceil(total / limit) },
       };
     }
@@ -366,14 +470,29 @@ export class LeaderboardService {
     const dateFrom = this.getDateRangeStart(period);
     const [results, total] = await Promise.all([
       this.prisma.wallet.findMany({
-        where: { user: { transactions: { some: { type: 'RECHARGE', createdAt: { gte: dateFrom } } } } },
+        where: {
+          user: {
+            transactions: {
+              some: { type: 'RECHARGE', createdAt: { gte: dateFrom } },
+            },
+          },
+        },
         orderBy: { totalRecharge: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
         select: {
           userId: true,
           totalRecharge: true,
-          user: { select: { id: true, uid: true, displayName: true, avatar: true, isVip: true, vipLevel: true } },
+          user: {
+            select: {
+              id: true,
+              uid: true,
+              displayName: true,
+              avatar: true,
+              isVip: true,
+              vipLevel: true,
+            },
+          },
         },
       }),
       this.prisma.wallet.count(),
@@ -447,7 +566,11 @@ export class LeaderboardService {
    */
   async updateScore(type: string, memberId: string, score: number) {
     const periods: Period[] = ['daily', 'weekly', 'monthly'];
-    const ttlMap: Record<Period, number> = { daily: 86400, weekly: 604800, monthly: 2592000 };
+    const ttlMap: Record<Period, number> = {
+      daily: 86400,
+      weekly: 604800,
+      monthly: 2592000,
+    };
 
     for (const period of periods) {
       const key = this.buildRedisKey(type, period);
@@ -456,7 +579,9 @@ export class LeaderboardService {
     }
   }
 
-  private parseZRevrangeWithScores(raw: string[]): { member: string; score: number }[] {
+  private parseZRevrangeWithScores(
+    raw: string[],
+  ): { member: string; score: number }[] {
     const result: { member: string; score: number }[] = [];
     for (let i = 0; i < raw.length; i += 2) {
       result.push({ member: raw[i], score: parseFloat(raw[i + 1]) });

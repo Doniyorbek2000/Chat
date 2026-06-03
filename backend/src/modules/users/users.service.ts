@@ -78,9 +78,16 @@ export class UsersService {
     });
   }
 
-  async uploadAvatar(userId: string, file: Express.Multer.File): Promise<string> {
+  async uploadAvatar(
+    userId: string,
+    file: Express.Multer.File,
+  ): Promise<string> {
     const key = `avatars/${userId}/${Date.now()}_${file.originalname}`;
-    const url = await this.storageService.uploadFile(file.buffer, key, file.mimetype);
+    const url = await this.storageService.uploadFile(
+      file.buffer,
+      key,
+      file.mimetype,
+    );
 
     await this.prisma.user.update({
       where: { id: userId },
@@ -90,9 +97,16 @@ export class UsersService {
     return url;
   }
 
-  async uploadCover(userId: string, file: Express.Multer.File): Promise<string> {
+  async uploadCover(
+    userId: string,
+    file: Express.Multer.File,
+  ): Promise<string> {
     const key = `covers/${userId}/${Date.now()}_${file.originalname}`;
-    const url = await this.storageService.uploadFile(file.buffer, key, file.mimetype);
+    const url = await this.storageService.uploadFile(
+      file.buffer,
+      key,
+      file.mimetype,
+    );
 
     await this.prisma.user.update({
       where: { id: userId },
@@ -107,7 +121,9 @@ export class UsersService {
       throw new BadRequestException('Cannot follow yourself');
     }
 
-    const following = await this.prisma.user.findUnique({ where: { id: followingId } });
+    const following = await this.prisma.user.findUnique({
+      where: { id: followingId },
+    });
     if (!following) throw new NotFoundException('User not found');
 
     const existing = await this.prisma.follow.findUnique({
@@ -212,10 +228,13 @@ export class UsersService {
     const alreadyVisited = await this.redis.get(key);
 
     if (!alreadyVisited) {
-      await this.redis.lpush(`visitors:${profileId}`, JSON.stringify({
-        visitorId,
-        timestamp: Date.now(),
-      }));
+      await this.redis.lpush(
+        `visitors:${profileId}`,
+        JSON.stringify({
+          visitorId,
+          timestamp: Date.now(),
+        }),
+      );
       await this.redis.ltrim(`visitors:${profileId}`, 0, 99);
       await this.redis.set(key, '1', 'EX', 86400);
     }

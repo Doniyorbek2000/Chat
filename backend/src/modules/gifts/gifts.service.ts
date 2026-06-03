@@ -1,8 +1,11 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { WalletService } from '../wallet/wallet.service';
 import { SendGiftDto } from './dto/gift.dto';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class GiftsService {
@@ -34,7 +37,9 @@ export class GiftsService {
   }
 
   async sendGift(senderId: string, dto: SendGiftDto) {
-    const gift = await this.prisma.gift.findUnique({ where: { id: dto.giftId } });
+    const gift = await this.prisma.gift.findUnique({
+      where: { id: dto.giftId },
+    });
     if (!gift || !gift.isActive) throw new NotFoundException('Gift not found');
 
     const quantity = dto.quantity || 1;
@@ -50,13 +55,23 @@ export class GiftsService {
 
     // Deduct coins from sender
     if (totalCoins > 0) {
-      await this.wallet.deductCoins(senderId, totalCoins, `Gift: ${gift.name} x${quantity}`, dto.giftId);
+      await this.wallet.deductCoins(
+        senderId,
+        totalCoins,
+        `Gift: ${gift.name} x${quantity}`,
+        dto.giftId,
+      );
     }
 
     // Add diamonds to receiver (70% of coin value as diamonds)
     const diamondsToReceive = Math.floor(totalCoins * 0.7) || actualDiamonds;
     if (dto.receiverId) {
-      await this.wallet.addDiamonds(dto.receiverId, diamondsToReceive, `Gift received: ${gift.name}`, senderId);
+      await this.wallet.addDiamonds(
+        dto.receiverId,
+        diamondsToReceive,
+        `Gift received: ${gift.name}`,
+        senderId,
+      );
     }
 
     // Record transaction
@@ -73,8 +88,19 @@ export class GiftsService {
       },
       include: {
         gift: true,
-        sender: { select: { id: true, uid: true, displayName: true, avatar: true, isVip: true, vipLevel: true } },
-        receiver: { select: { id: true, uid: true, displayName: true, avatar: true } },
+        sender: {
+          select: {
+            id: true,
+            uid: true,
+            displayName: true,
+            avatar: true,
+            isVip: true,
+            vipLevel: true,
+          },
+        },
+        receiver: {
+          select: { id: true, uid: true, displayName: true, avatar: true },
+        },
       },
     });
 
@@ -89,16 +115,26 @@ export class GiftsService {
     return tx;
   }
 
-  async getGiftHistory(userId: string, type: 'sent' | 'received' = 'sent', page = 1, limit = 20) {
-    const where = type === 'sent' ? { senderId: userId } : { receiverId: userId };
+  async getGiftHistory(
+    userId: string,
+    type: 'sent' | 'received' = 'sent',
+    page = 1,
+    limit = 20,
+  ) {
+    const where =
+      type === 'sent' ? { senderId: userId } : { receiverId: userId };
 
     const [data, total] = await Promise.all([
       this.prisma.giftTransaction.findMany({
         where,
         include: {
           gift: true,
-          sender: { select: { id: true, uid: true, displayName: true, avatar: true } },
-          receiver: { select: { id: true, uid: true, displayName: true, avatar: true } },
+          sender: {
+            select: { id: true, uid: true, displayName: true, avatar: true },
+          },
+          receiver: {
+            select: { id: true, uid: true, displayName: true, avatar: true },
+          },
         },
         skip: (page - 1) * limit,
         take: limit,

@@ -43,7 +43,10 @@ export class GiftsController {
   }
 
   @Get('top-receivers')
-  getTopReceivers(@Query('roomId') roomId?: string, @Query('limit') limit = 10) {
+  getTopReceivers(
+    @Query('roomId') roomId?: string,
+    @Query('limit') limit = 10,
+  ) {
     return this.giftsService.getTopReceivers(roomId, +limit);
   }
 }

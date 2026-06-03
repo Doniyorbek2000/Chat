@@ -44,20 +44,14 @@ export class VipController {
   @Post('purchase')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Purchase VIP subscription' })
-  purchaseVip(
-    @CurrentUser('id') userId: string,
-    @Body() dto: PurchaseVipDto,
-  ) {
+  purchaseVip(@CurrentUser('id') userId: string, @Body() dto: PurchaseVipDto) {
     return this.vipService.purchaseVip(userId, dto.planId);
   }
 
   @Post('renew')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Renew VIP subscription' })
-  renewVip(
-    @CurrentUser('id') userId: string,
-    @Body() dto: PurchaseVipDto,
-  ) {
+  renewVip(@CurrentUser('id') userId: string, @Body() dto: PurchaseVipDto) {
     return this.vipService.renewVip(userId, dto.planId);
   }
 

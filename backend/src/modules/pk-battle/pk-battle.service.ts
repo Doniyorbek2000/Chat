@@ -20,7 +20,11 @@ export class PkBattleService {
     @InjectRedis() private redis: Redis,
   ) {}
 
-  async challengeRoom(challengerHostId: string, challengerRoomId: string, defenderRoomId: string) {
+  async challengeRoom(
+    challengerHostId: string,
+    challengerRoomId: string,
+    defenderRoomId: string,
+  ) {
     const challengerRoom = await this.prisma.voiceRoom.findUnique({
       where: { id: challengerRoomId },
     });
@@ -35,7 +39,8 @@ export class PkBattleService {
     });
 
     if (!defenderRoom) throw new NotFoundException('Defender room not found');
-    if (!defenderRoom.isLive) throw new BadRequestException('Defender room is not live');
+    if (!defenderRoom.isLive)
+      throw new BadRequestException('Defender room is not live');
 
     const activeBattle = await this.prisma.pkBattle.findFirst({
       where: {
@@ -49,7 +54,9 @@ export class PkBattleService {
     });
 
     if (activeBattle) {
-      throw new BadRequestException('One of the rooms is already in a PK battle');
+      throw new BadRequestException(
+        'One of the rooms is already in a PK battle',
+      );
     }
 
     const battle = await this.prisma.pkBattle.create({
@@ -60,8 +67,20 @@ export class PkBattleService {
         duration: 300,
       },
       include: {
-        room1: { include: { host: { select: { id: true, uid: true, displayName: true, avatar: true } } } },
-        room2: { include: { host: { select: { id: true, uid: true, displayName: true, avatar: true } } } },
+        room1: {
+          include: {
+            host: {
+              select: { id: true, uid: true, displayName: true, avatar: true },
+            },
+          },
+        },
+        room2: {
+          include: {
+            host: {
+              select: { id: true, uid: true, displayName: true, avatar: true },
+            },
+          },
+        },
       },
     });
 
@@ -131,7 +150,9 @@ export class PkBattleService {
   }
 
   async updateScore(battleId: string, roomId: string, additionalScore: number) {
-    const battle = await this.prisma.pkBattle.findUnique({ where: { id: battleId } });
+    const battle = await this.prisma.pkBattle.findUnique({
+      where: { id: battleId },
+    });
     if (!battle) throw new NotFoundException('Battle not found');
     if (battle.status !== BattleStatus.ACTIVE) {
       throw new BadRequestException('Battle is not active');
@@ -155,7 +176,9 @@ export class PkBattleService {
   }
 
   async endBattle(battleId: string) {
-    const battle = await this.prisma.pkBattle.findUnique({ where: { id: battleId } });
+    const battle = await this.prisma.pkBattle.findUnique({
+      where: { id: battleId },
+    });
 
     if (!battle || battle.status !== BattleStatus.ACTIVE) {
       return;
@@ -183,7 +206,9 @@ export class PkBattleService {
       data: { pkBattleId: null },
     });
 
-    this.logger.log(`PK Battle ${battleId} ended. Winner: ${winnerId || 'Draw'}`);
+    this.logger.log(
+      `PK Battle ${battleId} ended. Winner: ${winnerId || 'Draw'}`,
+    );
     return updatedBattle;
   }
 
@@ -198,12 +223,26 @@ export class PkBattleService {
         include: {
           room1: {
             include: {
-              host: { select: { id: true, uid: true, displayName: true, avatar: true } },
+              host: {
+                select: {
+                  id: true,
+                  uid: true,
+                  displayName: true,
+                  avatar: true,
+                },
+              },
             },
           },
           room2: {
             include: {
-              host: { select: { id: true, uid: true, displayName: true, avatar: true } },
+              host: {
+                select: {
+                  id: true,
+                  uid: true,
+                  displayName: true,
+                  avatar: true,
+                },
+              },
             },
           },
         },
@@ -234,12 +273,16 @@ export class PkBattleService {
       include: {
         room1: {
           include: {
-            host: { select: { id: true, uid: true, displayName: true, avatar: true } },
+            host: {
+              select: { id: true, uid: true, displayName: true, avatar: true },
+            },
           },
         },
         room2: {
           include: {
-            host: { select: { id: true, uid: true, displayName: true, avatar: true } },
+            host: {
+              select: { id: true, uid: true, displayName: true, avatar: true },
+            },
           },
         },
       },

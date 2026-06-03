@@ -84,13 +84,21 @@ export class StorageService {
     return url.replace(prefix, '');
   }
 
-  async uploadAvatar(buffer: Buffer, userId: string, originalName: string): Promise<string> {
+  async uploadAvatar(
+    buffer: Buffer,
+    userId: string,
+    originalName: string,
+  ): Promise<string> {
     const ext = originalName.split('.').pop() || 'jpg';
     const key = `avatars/${userId}/${uuidv4()}.${ext}`;
     return this.uploadFile(buffer, key, `image/${ext}`);
   }
 
-  async uploadGiftAnimation(buffer: Buffer, giftId: string, originalName: string): Promise<string> {
+  async uploadGiftAnimation(
+    buffer: Buffer,
+    giftId: string,
+    originalName: string,
+  ): Promise<string> {
     const ext = originalName.split('.').pop() || 'json';
     const key = `gifts/animations/${giftId}/${uuidv4()}.${ext}`;
     const contentTypeMap: Record<string, string> = {
@@ -101,10 +109,18 @@ export class StorageService {
       jpg: 'image/jpeg',
       webp: 'image/webp',
     };
-    return this.uploadFile(buffer, key, contentTypeMap[ext] || 'application/octet-stream');
+    return this.uploadFile(
+      buffer,
+      key,
+      contentTypeMap[ext] || 'application/octet-stream',
+    );
   }
 
-  async uploadRoomCover(buffer: Buffer, roomId: string, originalName: string): Promise<string> {
+  async uploadRoomCover(
+    buffer: Buffer,
+    roomId: string,
+    originalName: string,
+  ): Promise<string> {
     const ext = originalName.split('.').pop() || 'jpg';
     const key = `rooms/${roomId}/cover.${ext}`;
     return this.uploadFile(buffer, key, `image/${ext}`);

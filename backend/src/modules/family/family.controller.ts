@@ -10,7 +10,12 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { FamilyService } from './family.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -99,12 +104,21 @@ export class FamilyController {
     @Query('page') page = 1,
     @Query('limit') limit = 20,
   ) {
-    return this.familyService.getFamilies({ search, country, page: +page, limit: +limit });
+    return this.familyService.getFamilies({
+      search,
+      country,
+      page: +page,
+      limit: +limit,
+    });
   }
 
   @Get('ranking')
   @ApiOperation({ summary: 'Get family rankings' })
-  @ApiQuery({ name: 'period', required: false, enum: ['daily', 'weekly', 'monthly'] })
+  @ApiQuery({
+    name: 'period',
+    required: false,
+    enum: ['daily', 'weekly', 'monthly'],
+  })
   getFamilyRanking(@Query('period') period: any = 'weekly') {
     return this.familyService.getFamilyRanking(period);
   }
@@ -128,10 +142,7 @@ export class FamilyController {
   @Post(':id/join')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Join a family' })
-  joinFamily(
-    @CurrentUser('id') userId: string,
-    @Param('id') familyId: string,
-  ) {
+  joinFamily(@CurrentUser('id') userId: string, @Param('id') familyId: string) {
     return this.familyService.joinFamily(userId, familyId);
   }
 
@@ -163,7 +174,12 @@ export class FamilyController {
     @Param('userId') targetUserId: string,
     @Body() dto: PromoteDto,
   ) {
-    return this.familyService.promoteMember(adminId, familyId, targetUserId, dto.role);
+    return this.familyService.promoteMember(
+      adminId,
+      familyId,
+      targetUserId,
+      dto.role,
+    );
   }
 
   @Post(':id/members/:userId/kick')

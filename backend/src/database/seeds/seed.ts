@@ -1,4 +1,12 @@
-import { PrismaClient, UserRole, GiftCategory, GiftType, Currency, VehicleLevel, FrameType } from '@prisma/client';
+import {
+  PrismaClient,
+  UserRole,
+  GiftCategory,
+  GiftType,
+  Currency,
+  VehicleLevel,
+  FrameType,
+} from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -371,7 +379,9 @@ async function main() {
     { coins: 5000, priceUSD: 49.99, priceUZS: 600000, bonus: 1000 },
     { coins: 10000, priceUSD: 99.99, priceUZS: 1200000, bonus: 3000 },
   ];
-  console.log(`✅ ${coinPackages.length} coin packages defined (store in app config)`);
+  console.log(
+    `✅ ${coinPackages.length} coin packages defined (store in app config)`,
+  );
 
   // ==================== ACHIEVEMENTS ====================
   const achievements = [
@@ -556,7 +566,9 @@ async function main() {
 
   for (const vehicle of vehicles) {
     await prisma.vehicle.upsert({
-      where: { id: `vehicle-${vehicle.name.toLowerCase().replace(/\s+/g, '-')}` },
+      where: {
+        id: `vehicle-${vehicle.name.toLowerCase().replace(/\s+/g, '-')}`,
+      },
       update: { coinPrice: vehicle.coinPrice },
       create: {
         id: `vehicle-${vehicle.name.toLowerCase().replace(/\s+/g, '-')}`,

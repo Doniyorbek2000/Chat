@@ -46,7 +46,11 @@ export class PkBattleController {
     @CurrentUser('id') userId: string,
     @Body() dto: ChallengeRoomDto,
   ) {
-    return this.pkBattleService.challengeRoom(userId, dto.myRoomId, dto.defenderRoomId);
+    return this.pkBattleService.challengeRoom(
+      userId,
+      dto.myRoomId,
+      dto.defenderRoomId,
+    );
   }
 
   @Post(':id/accept')

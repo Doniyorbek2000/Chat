@@ -20,12 +20,18 @@ export class CoupleService {
     @InjectRedis() private redis: Redis,
   ) {}
 
-  async sendCoupleRequest(senderId: string, receiverId: string, message?: string) {
+  async sendCoupleRequest(
+    senderId: string,
+    receiverId: string,
+    message?: string,
+  ) {
     if (senderId === receiverId) {
       throw new BadRequestException('Cannot send couple request to yourself');
     }
 
-    const receiver = await this.prisma.user.findUnique({ where: { id: receiverId } });
+    const receiver = await this.prisma.user.findUnique({
+      where: { id: receiverId },
+    });
     if (!receiver) throw new NotFoundException('User not found');
 
     const existingCouple = await this.prisma.couple.findFirst({
@@ -51,20 +57,28 @@ export class CoupleService {
     });
 
     if (receiverCouple) {
-      throw new BadRequestException('This user is already in a couple relationship');
+      throw new BadRequestException(
+        'This user is already in a couple relationship',
+      );
     }
 
     const existingRequest = await this.prisma.coupleRequest.findFirst({
       where: {
         OR: [
           { senderId, receiverId, status: CoupleRequestStatus.PENDING },
-          { senderId: receiverId, receiverId: senderId, status: CoupleRequestStatus.PENDING },
+          {
+            senderId: receiverId,
+            receiverId: senderId,
+            status: CoupleRequestStatus.PENDING,
+          },
         ],
       },
     });
 
     if (existingRequest) {
-      throw new ConflictException('A pending request already exists between you two');
+      throw new ConflictException(
+        'A pending request already exists between you two',
+      );
     }
 
     return this.prisma.coupleRequest.create({
@@ -86,7 +100,8 @@ export class CoupleService {
     });
 
     if (!request) throw new NotFoundException('Request not found');
-    if (request.receiverId !== userId) throw new ForbiddenException('Not authorized');
+    if (request.receiverId !== userId)
+      throw new ForbiddenException('Not authorized');
     if (request.status !== CoupleRequestStatus.PENDING) {
       throw new BadRequestException('Request is no longer pending');
     }
@@ -136,7 +151,8 @@ export class CoupleService {
     });
 
     if (!request) throw new NotFoundException('Request not found');
-    if (request.receiverId !== userId) throw new ForbiddenException('Not authorized');
+    if (request.receiverId !== userId)
+      throw new ForbiddenException('Not authorized');
 
     return this.prisma.coupleRequest.update({
       where: { id: requestId },
@@ -145,7 +161,9 @@ export class CoupleService {
   }
 
   async endCouple(userId: string, coupleId: string, reason?: string) {
-    const couple = await this.prisma.couple.findUnique({ where: { id: coupleId } });
+    const couple = await this.prisma.couple.findUnique({
+      where: { id: coupleId },
+    });
     if (!couple) throw new NotFoundException('Couple not found');
 
     if (couple.user1Id !== userId && couple.user2Id !== userId) {
@@ -205,7 +223,8 @@ export class CoupleService {
 
     const anniversaryDays = couple.anniversaryDate
       ? Math.floor(
-          (new Date().getTime() - couple.anniversaryDate.getTime()) / (1000 * 60 * 60 * 24),
+          (new Date().getTime() - couple.anniversaryDate.getTime()) /
+            (1000 * 60 * 60 * 24),
         )
       : 0;
 
@@ -237,7 +256,9 @@ export class CoupleService {
   }
 
   async getCoupleGifts(coupleId: string) {
-    const couple = await this.prisma.couple.findUnique({ where: { id: coupleId } });
+    const couple = await this.prisma.couple.findUnique({
+      where: { id: coupleId },
+    });
     if (!couple) throw new NotFoundException('Couple not found');
 
     return this.prisma.giftTransaction.findMany({
@@ -249,8 +270,12 @@ export class CoupleService {
       },
       include: {
         gift: true,
-        sender: { select: { id: true, uid: true, displayName: true, avatar: true } },
-        receiver: { select: { id: true, uid: true, displayName: true, avatar: true } },
+        sender: {
+          select: { id: true, uid: true, displayName: true, avatar: true },
+        },
+        receiver: {
+          select: { id: true, uid: true, displayName: true, avatar: true },
+        },
       },
       orderBy: { createdAt: 'desc' },
       take: 50,
@@ -266,8 +291,12 @@ export class CoupleService {
         ],
       },
       include: {
-        sender: { select: { id: true, uid: true, displayName: true, avatar: true } },
-        receiver: { select: { id: true, uid: true, displayName: true, avatar: true } },
+        sender: {
+          select: { id: true, uid: true, displayName: true, avatar: true },
+        },
+        receiver: {
+          select: { id: true, uid: true, displayName: true, avatar: true },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
