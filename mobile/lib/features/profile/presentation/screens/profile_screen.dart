@@ -60,6 +60,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 _buildAvatarSection(user, isOwn),
                 _buildStatsRow(user),
                 if (!isOwn) _buildActionButtons(user),
+                if (isOwn) _buildPremiumShortcuts(),
                 _buildRecentRooms(),
                 const SizedBox(height: 40),
               ],
@@ -418,6 +419,97 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildPremiumShortcuts() {
+    final shortcuts = [
+      {'label': 'Do\'kon', 'icon': Icons.store, 'route': AppRoutes.shop},
+      {'label': 'Noble', 'icon': Icons.auto_awesome, 'route': AppRoutes.noble},
+      {'label': 'Medal', 'icon': Icons.military_tech, 'route': AppRoutes.medals},
+      {'label': 'Kolleksiya', 'icon': Icons.inventory_2_outlined, 'route': AppRoutes.collection},
+      {'label': 'Ismlik taxtasi', 'icon': Icons.badge_outlined, 'route': AppRoutes.nameplate},
+      {'label': 'VIP', 'icon': Icons.workspace_premium, 'route': AppRoutes.vip},
+    ];
+
+    return Transform.translate(
+      offset: const Offset(0, -14),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(bottom: 10),
+              child: Text(
+                'Premium',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+            ),
+            SizedBox(
+              height: 72,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: shortcuts.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (ctx, i) {
+                  final item = shortcuts[i];
+                  return GestureDetector(
+                    onTap: () => context.push(item['route'] as String),
+                    child: Container(
+                      width: 64,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 10),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            AppColors.primary.withOpacity(0.25),
+                            AppColors.cardDark,
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.primary.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            item['icon'] as IconData,
+                            color: AppColors.primaryLight,
+                            size: 22,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            item['label'] as String,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 9,
+                              fontFamily: 'Poppins',
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.05);
   }
 
   Widget _buildRecentRooms() {
