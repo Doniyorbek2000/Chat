@@ -420,6 +420,49 @@ class ApiClient {
   async deleteCoinPackage(id: string): Promise<void> {
     return this.request({ url: `/admin/settings/coin-packages/${id}`, method: 'DELETE' })
   }
+
+  // ============ VIP (real API) ============
+  async getVipPlans(): Promise<any[]> {
+    return this.request({ url: '/vip/packages', method: 'GET' })
+  }
+
+  async updateVipPlan(id: string, data: Record<string, any>): Promise<any> {
+    return this.request({ url: `/admin/vip/plans/${id}`, method: 'PATCH', data })
+  }
+
+  // ============ NOBLE ============
+  async getNoblePlans(): Promise<any[]> {
+    return this.request({ url: '/admin/noble/plans', method: 'GET' })
+  }
+
+  async createNoblePlan(data: Record<string, any>): Promise<any> {
+    return this.request({ url: '/admin/noble/plans', method: 'POST', data })
+  }
+
+  async updateNoblePlan(id: string, data: Record<string, any>): Promise<any> {
+    return this.request({ url: `/admin/noble/plans/${id}`, method: 'PATCH', data })
+  }
+
+  async deleteNoblePlan(id: string): Promise<void> {
+    return this.request({ url: `/admin/noble/plans/${id}`, method: 'DELETE' })
+  }
+
+  // ============ SHOP ============
+  async getShopItems(params?: { category?: string; page?: number; limit?: number }): Promise<any> {
+    return this.request({ url: '/admin/shop/items', method: 'GET', params })
+  }
+
+  async createShopItem(data: Record<string, any>): Promise<any> {
+    return this.request({ url: '/admin/shop/items', method: 'POST', data })
+  }
+
+  async updateShopItem(id: string, data: Record<string, any>): Promise<any> {
+    return this.request({ url: `/admin/shop/items/${id}`, method: 'PATCH', data })
+  }
+
+  async deleteShopItem(id: string): Promise<void> {
+    return this.request({ url: `/admin/shop/items/${id}`, method: 'DELETE' })
+  }
 }
 
 export const api = new ApiClient()

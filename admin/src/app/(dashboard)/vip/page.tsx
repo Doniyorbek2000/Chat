@@ -1,13 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { PencilSquareIcon, StarIcon, UsersIcon } from '@heroicons/react/24/outline'
 import Modal from '@/components/ui/Modal'
 import Toggle from '@/components/ui/Toggle'
 import FormField from '@/components/ui/FormField'
 import { api } from '@/lib/api'
 import { formatNumber } from '@/lib/utils'
-import type { VIPPlan } from '@/types'
 import toast from 'react-hot-toast'
 
 const vipColors: Record<number, { bg: string; border: string; badge: string; text: string }> = {
@@ -25,21 +24,18 @@ const vipColors: Record<number, { bg: string; border: string; badge: string; tex
 
 const vipNames = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Ruby', 'Sapphire', 'Emerald', 'Crystal', 'Legend']
 
-const mockPlans: (VIPPlan & { subscribers: number })[] = Array.from({ length: 10 }, (_, i) => ({
-  id: `vip-${i + 1}`,
-  level: i + 1,
-  name: `VIP ${vipNames[i]}`,
-  priceMonthly: [500, 1200, 2500, 5000, 10000, 20000, 35000, 60000, 90000, 150000][i],
-  priceYearly: [5000, 12000, 25000, 50000, 100000, 200000, 350000, 600000, 900000, 1500000][i],
-  benefits: [
-    { type: 'frame', value: `frame_vip${i + 1}`, description: 'Exclusive avatar frame' },
-    { type: 'badge', value: `badge_vip${i + 1}`, description: 'VIP badge in chat' },
-    { type: 'gift_bonus', value: (i + 1) * 5, description: `${(i + 1) * 5}% gift bonus` },
-  ],
-  color: ['#3b82f6','#22c55e','#eab308','#f97316','#ef4444','#ec4899','#a855f7','#6366f1','#06b6d4','#f59e0b'][i],
-  isActive: true,
-  subscribers: Math.floor(Math.random() * 5000) + 200,
-}))
+type VipPlanWithSubs = {
+  id: string
+  level: number
+  name: string
+  priceMonthly: number
+  priceYearly: number
+  benefits: { type: string; value: any; description: string }[]
+  frameUrl?: string
+  color?: string
+  isActive: boolean
+  subscribers: number
+}
 
 interface EditForm {
   priceMonthly: string
@@ -50,16 +46,44 @@ interface EditForm {
 }
 
 export default function VipPage() {
-  const [plans, setPlans] = useState(mockPlans)
-  const [editTarget, setEditTarget] = useState<(typeof mockPlans)[0] | null>(null)
+  const [plans, setPlans] = useState<VipPlanWithSubs[]>([])
+  const [loading, setLoading] = useState(true)
+  const [editTarget, setEditTarget] = useState<VipPlanWithSubs | null>(null)
   const [form, setForm] = useState<EditForm>({ priceMonthly: '', priceYearly: '', benefits: '', frameUrl: '', isActive: true })
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Partial<EditForm>>({})
 
+  const loadPlans = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await api.getVipPlans()
+      const raw = (res as any)?.items ?? (res as any)?.data ?? res ?? []
+      const items = Array.isArray(raw) ? raw : []
+      setPlans(items.map((p: any, i: number) => ({
+        id: p.id ?? `vip-${i + 1}`,
+        level: p.level ?? i + 1,
+        name: p.name ?? `VIP ${vipNames[i]}`,
+        priceMonthly: p.priceMonthly ?? p.monthlyPrice ?? 0,
+        priceYearly: p.priceYearly ?? p.yearlyPrice ?? 0,
+        benefits: p.benefits ?? [],
+        frameUrl: p.frameUrl,
+        color: p.color,
+        isActive: p.isActive ?? true,
+        subscribers: p.subscriberCount ?? p.subscribers ?? 0,
+      })))
+    } catch {
+      toast.error('Failed to load VIP plans')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadPlans() }, [loadPlans])
+
   const totalSubscribers = plans.reduce((s, p) => s + p.subscribers, 0)
   const totalRevenue = plans.reduce((s, p) => s + p.subscribers * p.priceMonthly, 0)
 
-  const openEdit = (plan: typeof mockPlans[0]) => {
+  const openEdit = (plan: VipPlanWithSubs) => {
     setEditTarget(plan)
     setForm({
       priceMonthly: String(plan.priceMonthly),
@@ -83,7 +107,7 @@ export default function VipPage() {
     if (!editTarget || !validate()) return
     setSaving(true)
     try {
-      await api.updateVIPPlan(editTarget.id, {
+      await api.updateVipPlan(editTarget.id, {
         priceMonthly: Number(form.priceMonthly),
         priceYearly: Number(form.priceYearly),
         frameUrl: form.frameUrl || undefined,
@@ -101,6 +125,14 @@ export default function VipPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
   }
 
   return (

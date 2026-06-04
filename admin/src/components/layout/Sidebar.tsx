@@ -26,6 +26,8 @@ import {
   CurrencyDollarIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  SparklesIcon,
+  ShoppingBagIcon,
 } from '@heroicons/react/24/outline'
 
 interface NavItem {
@@ -82,6 +84,16 @@ const navItems: NavItem[] = [
     label: 'VIP Plans',
     href: '/vip',
     icon: StarIcon,
+  },
+  {
+    label: 'Noble',
+    href: '/noble',
+    icon: SparklesIcon,
+  },
+  {
+    label: 'Shop Items',
+    href: '/shop',
+    icon: ShoppingBagIcon,
   },
   {
     label: 'Agencies',

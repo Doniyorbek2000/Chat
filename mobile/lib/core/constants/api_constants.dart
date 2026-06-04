@@ -141,6 +141,21 @@ class ApiConstants {
   static const String reportUser = '/reports/user';
   static const String reportRoom = '/reports/room';
 
+  // Noble
+  static const String noblePlans = '/noble/plans';
+  static const String nobleMe = '/noble/me';
+  static const String noblePurchase = '/noble/purchase';
+  static const String nobleSend = '/noble/send';
+  static const String nobleCancel = '/noble/cancel';
+  static const String nobleHistory = '/noble/history';
+
+  // Shop
+  static const String shopItems = '/shop/items';
+  static const String shopMyItems = '/shop/items/mine';
+  static const String shopBuyItem = '/shop/items/{id}/buy';
+  static const String shopEquipItem = '/shop/items/{id}/equip';
+  static const String shopUnequipItem = '/shop/items/{id}/equip';
+
   // Socket Events
   static const String socketRoom = 'room';
   static const String socketChat = 'chat';

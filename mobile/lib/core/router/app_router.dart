@@ -28,6 +28,8 @@ import '../../features/couple/presentation/screens/couple_screen.dart';
 import '../../features/events/presentation/screens/events_screen.dart';
 import '../../features/events/presentation/screens/event_detail_screen.dart';
 import '../../features/rewards/presentation/screens/daily_rewards_screen.dart';
+import '../../features/noble/presentation/screens/noble_screen.dart';
+import '../../features/shop/presentation/screens/shop_screen.dart';
 import '../providers/auth_provider.dart';
 
 class AppRoutes {
@@ -61,6 +63,8 @@ class AppRoutes {
   static const String events = '/events';
   static const String eventDetail = '/events/:id';
   static const String dailyRewards = '/rewards/daily';
+  static const String noble = '/noble';
+  static const String shop = '/shop';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -305,6 +309,20 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => _buildPage(
           state,
           const DailyRewardsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.noble,
+        pageBuilder: (context, state) => _buildPage(
+          state,
+          const NobleScreen(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.shop,
+        pageBuilder: (context, state) => _buildPage(
+          state,
+          const ShopScreen(),
         ),
       ),
     ],
