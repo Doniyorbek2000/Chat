@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Param,
   Body,
   UseGuards,
 } from '@nestjs/common';
@@ -21,6 +22,11 @@ export class NobleController {
   @Get('plans')
   getPlans() {
     return this.nobleService.getPlans();
+  }
+
+  @Get('plans/:id')
+  getPlan(@Param('id') id: string) {
+    return this.nobleService.getPlanById(id);
   }
 
   @Get('me')

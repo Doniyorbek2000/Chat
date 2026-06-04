@@ -25,6 +25,25 @@ export class MedalsService {
     });
   }
 
+  async getMedalById(id: string) {
+    const medal = await this.prisma.medal.findUnique({ where: { id } });
+    if (!medal) throw new NotFoundException('Medal not found');
+    return medal;
+  }
+
+  async getMedalOwners(id: string, limit = 20) {
+    return this.prisma.userMedal.findMany({
+      where: { medalId: id },
+      take: limit,
+      orderBy: { unlockedAt: 'asc' },
+      include: {
+        user: {
+          select: { id: true, uid: true, displayName: true, avatar: true, level: true },
+        },
+      },
+    });
+  }
+
   async getMyMedals(userId: string) {
     const [userMedals, prestigeSnapshot] = await Promise.all([
       this.prisma.userMedal.findMany({

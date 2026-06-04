@@ -23,6 +23,12 @@ export class NobleService {
     });
   }
 
+  async getPlanById(id: string) {
+    const plan = await this.prisma.noblePlan.findUnique({ where: { id } });
+    if (!plan || !plan.isActive) throw new NotFoundException('Noble plan not found');
+    return plan;
+  }
+
   async getMySubscription(userId: string) {
     return this.prisma.userNobleSubscription.findUnique({
       where: { userId },

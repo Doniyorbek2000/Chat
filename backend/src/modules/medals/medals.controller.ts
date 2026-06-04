@@ -34,6 +34,19 @@ export class MedalsController {
     return this.medalsService.getMyMedals(userId);
   }
 
+  @Get(':id')
+  getMedal(@Param('id') id: string) {
+    return this.medalsService.getMedalById(id);
+  }
+
+  @Get(':id/owners')
+  getMedalOwners(
+    @Param('id') id: string,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit = 20,
+  ) {
+    return this.medalsService.getMedalOwners(id, limit);
+  }
+
   @Get('prestige-rules')
   getPrestigeRules() {
     return this.medalsService.getPrestigeRules();

@@ -159,23 +159,38 @@ export class VipService {
   async checkVipBenefits(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { isVip: true, vipLevel: true },
+      select: { isVip: true, vipLevel: true, vipExpiresAt: true },
     });
 
     if (!user || !user.isVip) {
-      return { hasVip: false, benefits: [] };
+      return { hasVip: false, vipLevel: 0, benefits: [] };
     }
 
-    const benefits = [];
-    if (user.vipLevel >= 1) benefits.push('exclusive_frame', 'entry_effect');
-    if (user.vipLevel >= 3) benefits.push('chat_bubble', 'exclusive_gifts');
-    if (user.vipLevel >= 5) benefits.push('no_ads', 'priority_seat');
-    if (user.vipLevel >= 7)
-      benefits.push('exclusive_vehicle', 'vip_room_access');
-    if (user.vipLevel >= 10)
-      benefits.push('global_announcement', 'dedicated_support');
+    const plan = await this.prisma.vipPlan.findFirst({
+      where: { level: user.vipLevel },
+    });
 
-    return { hasVip: true, vipLevel: user.vipLevel, benefits };
+    const benefitFlags: string[] = [];
+    if (user.vipLevel >= 1) benefitFlags.push('exclusive_frame', 'entry_effect');
+    if (user.vipLevel >= 3) benefitFlags.push('chat_bubble', 'exclusive_gifts');
+    if (user.vipLevel >= 5) benefitFlags.push('no_ads', 'priority_seat');
+    if (user.vipLevel >= 7) benefitFlags.push('exclusive_vehicle', 'vip_room_access');
+    if (user.vipLevel >= 10) benefitFlags.push('global_announcement', 'dedicated_support');
+
+    return {
+      hasVip: true,
+      vipLevel: user.vipLevel,
+      vipExpiresAt: user.vipExpiresAt,
+      frameUrl: plan?.frameUrl ?? null,
+      chatBubbleUrl: plan?.chatBubbleUrl ?? null,
+      entryEffectUrl: plan?.entryEffectUrl ?? null,
+      giftDiscountPercent: (user.vipLevel ?? 0) * 2,
+      dailyCoinsBonus: (user.vipLevel ?? 0) * 50,
+      coloredName: user.vipLevel >= 5,
+      exclusiveGifts: user.vipLevel >= 3,
+      prioritySeat: user.vipLevel >= 5,
+      benefits: benefitFlags,
+    };
   }
 
   async applyVipFrame(userId: string) {
