@@ -87,6 +87,15 @@ class ApiClient {
     return this.request({ url: `/admin/dashboard/recent-transactions?limit=${limit}`, method: 'GET' })
   }
 
+  // ============ REVENUE (dedicated endpoints) ============
+  async getRevenueSummary(params?: { startDate?: string; endDate?: string }) {
+    return this.request({ url: '/admin/revenue/summary', method: 'GET', params })
+  }
+
+  async getTopRechargedUsers(limit: number = 10) {
+    return this.request({ url: `/admin/revenue/top-users?limit=${limit}`, method: 'GET' })
+  }
+
   // ============ USERS ============
   async getUsers(params: QueryParams): Promise<PaginatedResponse<User>> {
     return this.request({ url: '/admin/users', method: 'GET', params })

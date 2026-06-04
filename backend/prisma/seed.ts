@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole, GiftCategory, GiftType, VehicleLevel, RoomType, EventType, LinkType, Currency } from '@prisma/client';
+import { PrismaClient, UserRole, GiftCategory, GiftType, VehicleLevel, RoomType, EventType, LinkType, Currency, RechargeProductType } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -503,6 +503,131 @@ async function seedRooms(adminId: string) {
 // Main
 // ---------------------------------------------------------------------------
 
+async function seedRechargeProducts() {
+  console.log('Seeding recharge products...');
+
+  const products = [
+    {
+      productId: 'voxo_coin_1000000',
+      title: '1,000,000 Tanga',
+      type: RechargeProductType.COINS,
+      baseAmount: BigInt(1000000),
+      bonusAmount: BigInt(500000),
+      priceUzs: 9900,
+      isFirstRechargeOnly: false,
+      isActive: true,
+      sortOrder: 1,
+    },
+    {
+      productId: 'voxo_coin_5000000',
+      title: '5,000,000 Tanga',
+      type: RechargeProductType.COINS,
+      baseAmount: BigInt(5000000),
+      bonusAmount: BigInt(1000000),
+      priceUzs: 44900,
+      isFirstRechargeOnly: false,
+      isActive: true,
+      sortOrder: 2,
+    },
+    {
+      productId: 'voxo_coin_10000000',
+      title: '10,000,000 Tanga',
+      type: RechargeProductType.COINS,
+      baseAmount: BigInt(10000000),
+      bonusAmount: BigInt(1500000),
+      priceUzs: 79900,
+      isFirstRechargeOnly: false,
+      isActive: true,
+      sortOrder: 3,
+    },
+    {
+      productId: 'voxo_diamond_100',
+      title: '100 Olmos',
+      type: RechargeProductType.DIAMONDS,
+      baseAmount: BigInt(100),
+      bonusAmount: BigInt(0),
+      priceUzs: 9900,
+      isFirstRechargeOnly: false,
+      isActive: true,
+      sortOrder: 4,
+    },
+    {
+      productId: 'voxo_diamond_500',
+      title: '500 Olmos',
+      type: RechargeProductType.DIAMONDS,
+      baseAmount: BigInt(500),
+      bonusAmount: BigInt(0),
+      priceUzs: 44900,
+      isFirstRechargeOnly: false,
+      isActive: true,
+      sortOrder: 5,
+    },
+    {
+      productId: 'voxo_diamond_1000',
+      title: '1,000 Olmos',
+      type: RechargeProductType.DIAMONDS,
+      baseAmount: BigInt(1000),
+      bonusAmount: BigInt(0),
+      priceUzs: 79900,
+      isFirstRechargeOnly: false,
+      isActive: true,
+      sortOrder: 6,
+    },
+    {
+      productId: 'voxo_first_recharge_099',
+      title: "Birinchi to'ldirish (990 so'm)",
+      type: RechargeProductType.FIRST_RECHARGE,
+      baseAmount: BigInt(100000),
+      bonusAmount: BigInt(50000),
+      priceUzs: 990,
+      isFirstRechargeOnly: true,
+      isActive: true,
+      sortOrder: 1,
+    },
+    {
+      productId: 'voxo_first_recharge_499',
+      title: "Birinchi to'ldirish (4,900 so'm)",
+      type: RechargeProductType.FIRST_RECHARGE,
+      baseAmount: BigInt(500000),
+      bonusAmount: BigInt(250000),
+      priceUzs: 4900,
+      isFirstRechargeOnly: true,
+      isActive: true,
+      sortOrder: 2,
+    },
+    {
+      productId: 'voxo_first_recharge_999',
+      title: "Birinchi to'ldirish (9,900 so'm)",
+      type: RechargeProductType.FIRST_RECHARGE,
+      baseAmount: BigInt(1000000),
+      bonusAmount: BigInt(1000000),
+      priceUzs: 9900,
+      isFirstRechargeOnly: true,
+      isActive: true,
+      sortOrder: 3,
+    },
+  ];
+
+  for (const product of products) {
+    await prisma.rechargeProduct.upsert({
+      where: { productId: product.productId },
+      update: { ...product },
+      create: { ...product },
+    });
+  }
+
+  console.log(`  Seeded ${products.length} recharge products.`);
+
+  // Seed jackpot pool (singleton)
+  const existingPool = await prisma.jackpotPool.findFirst();
+  if (!existingPool) {
+    await prisma.jackpotPool.create({
+      data: { totalCoins: BigInt(0) },
+    });
+    console.log('  Seeded jackpot pool.');
+  }
+}
+
 async function main() {
   console.log('Starting VOXO database seed...\n');
 
@@ -531,6 +656,9 @@ async function main() {
 
   // Seed banners
   await seedBanners();
+
+  // Seed recharge products
+  await seedRechargeProducts();
 
   // Seed rooms (admin as host)
   await seedRooms(admin.id);

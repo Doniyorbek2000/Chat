@@ -12,13 +12,22 @@ import {
 } from './dto/payments.dto';
 import { TransactionType, Currency, TransactionStatus } from '@prisma/client';
 
-const COIN_PACKAGES: Record<string, { coins: number; amount: number }> = {
-  pkg_100: { coins: 100, amount: 999 },
-  pkg_500: { coins: 500, amount: 4490 },
-  pkg_1000: { coins: 1000, amount: 7990 },
-  pkg_5000: { coins: 5000, amount: 34990 },
-  pkg_10000: { coins: 10000, amount: 59990 },
-  pkg_50000: { coins: 50000, amount: 249990 },
+const COIN_PACKAGES: Record<string, { coins: number; bonus: number; amount: number }> = {
+  // Legacy IDs (kept for backward compat)
+  pkg_100: { coins: 100, bonus: 0, amount: 999 },
+  pkg_500: { coins: 500, bonus: 0, amount: 4490 },
+  pkg_1000: { coins: 1000, bonus: 0, amount: 7990 },
+  pkg_5000: { coins: 5000, bonus: 0, amount: 34990 },
+  pkg_10000: { coins: 10000, bonus: 0, amount: 59990 },
+  pkg_50000: { coins: 50000, bonus: 0, amount: 249990 },
+  // Current product IDs matching DB RechargeProduct
+  voxo_coin_1000000: { coins: 1000000, bonus: 500000, amount: 9900 },
+  voxo_coin_5000000: { coins: 5000000, bonus: 1000000, amount: 44900 },
+  voxo_coin_10000000: { coins: 10000000, bonus: 1500000, amount: 79900 },
+  // First recharge offers
+  voxo_first_recharge_099: { coins: 100000, bonus: 50000, amount: 990 },
+  voxo_first_recharge_499: { coins: 500000, bonus: 250000, amount: 4900 },
+  voxo_first_recharge_999: { coins: 1000000, bonus: 1000000, amount: 9900 },
 };
 
 @Injectable()
@@ -232,77 +241,120 @@ export class PaymentsService {
   ) {
     const { token, productId, packageName } = dto;
 
-    // In production: use Google Play Developer API to verify
-    // POST https://www.googleapis.com/androidpublisher/v3/applications/{packageName}/purchases/products/{productId}/tokens/{token}
-    // For now: dev mode accepts all purchases and credits wallet
-
     const isDev = this.config.get<string>('app.env') !== 'production';
+    const mockVerifyEnabled = this.config.get<string>('GOOGLE_PLAY_MOCK_VERIFY') === 'true';
 
-    if (!isDev) {
-      // Production verification would go here:
-      // const auth = new google.auth.GoogleAuth({ scopes: ['https://www.googleapis.com/auth/androidpublisher'] });
-      // const androidPublisher = google.androidpublisher({ version: 'v3', auth });
-      // const result = await androidPublisher.purchases.products.get({ packageName, productId, token });
-      // if (result.data.purchaseState !== 0) throw new BadRequestException('Purchase not valid');
+    if (!isDev && !mockVerifyEnabled) {
+      // Production: verify via Google Play Developer API
+      // Placeholder — wire up googleapis when service account JSON is configured
+      this.logger.warn(`[GooglePlay] Production verify not configured. productId=${productId}`);
       throw new BadRequestException(
         'Google Play verification not configured in production',
       );
     }
 
-    // Check for duplicate using unique index on googlePlayToken field
+    // Idempotency: reject duplicate tokens
     const existing = await this.prisma.transaction.findUnique({
       where: { googlePlayToken: token },
     });
-    if (existing) return { success: true, alreadyProcessed: true };
+    if (existing) {
+      const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
+      return {
+        success: true,
+        alreadyProcessed: true,
+        transactionId: existing.id,
+        newBalance: { coins: wallet?.coins ?? 0, diamonds: wallet?.diamonds ?? 0 },
+      };
+    }
 
-    // Map product ID to reward
+    // Map product ID → reward  (coins/bonus/diamonds)
     const productRewards: Record<
       string,
-      { coins?: number; diamonds?: number; vipLevel?: number; vipDays?: number }
+      { coins?: number; bonus?: number; diamonds?: number }
     > = {
+      voxo_coin_1000000: { coins: 1000000, bonus: 500000 },
+      voxo_coin_5000000: { coins: 5000000, bonus: 1000000 },
+      voxo_coin_10000000: { coins: 10000000, bonus: 1500000 },
+      voxo_diamond_100: { diamonds: 100 },
+      voxo_diamond_500: { diamonds: 500 },
+      voxo_diamond_1000: { diamonds: 1000 },
+      voxo_first_recharge_099: { coins: 100000, bonus: 50000 },
+      voxo_first_recharge_499: { coins: 500000, bonus: 250000 },
+      voxo_first_recharge_999: { coins: 1000000, bonus: 1000000 },
+      // Legacy IDs
       voxo_coins_small: { coins: 100 },
       voxo_coins_medium: { coins: 500 },
       voxo_coins_large: { coins: 1000 },
       voxo_diamonds_small: { diamonds: 50 },
       voxo_diamonds_medium: { diamonds: 200 },
       voxo_diamonds_large: { diamonds: 500 },
-      voxo_vip_1_month: { vipLevel: 1, vipDays: 30 },
-      voxo_vip_3_month: { vipLevel: 1, vipDays: 90 },
-      voxo_vip_12_month: { vipLevel: 1, vipDays: 365 },
     };
 
     const reward = productRewards[productId];
     if (!reward) throw new BadRequestException(`Unknown product: ${productId}`);
 
-    const txData = {
-      userId,
-      type: TransactionType.RECHARGE,
-      currency: reward.diamonds ? Currency.DIAMONDS : Currency.COINS,
-      amount: BigInt(reward.coins ?? reward.diamonds ?? 0),
-      balanceBefore: BigInt(0),
-      balanceAfter: BigInt(0),
-      status: TransactionStatus.COMPLETED,
-      description: `Google Play: ${productId}`,
-      googlePlayToken: token,
-      metadata: { productId, packageName },
+    // Create transaction record (googlePlayToken is @unique — prevents double processing)
+    const tx = await this.prisma.transaction.create({
+      data: {
+        userId,
+        type: TransactionType.RECHARGE,
+        currency: reward.diamonds ? Currency.DIAMONDS : Currency.COINS,
+        amount: BigInt((reward.coins ?? 0) + (reward.bonus ?? 0) + (reward.diamonds ?? 0)),
+        balanceBefore: BigInt(0),
+        balanceAfter: BigInt(0),
+        status: TransactionStatus.COMPLETED,
+        description: `Google Play: ${productId}`,
+        googlePlayToken: token,
+        metadata: { productId, packageName, bonus: reward.bonus ?? 0 },
+      },
+    });
+
+    const totalCoins = (reward.coins ?? 0) + (reward.bonus ?? 0);
+    if (reward.coins) {
+      await this.walletService.addCoins(userId, totalCoins, `Google Play: ${productId}`, tx.id);
+    }
+    if (reward.diamonds) {
+      await this.walletService.addDiamonds(userId, reward.diamonds, `Google Play: ${productId}`, tx.id);
+    }
+
+    // Mark first recharge if applicable
+    const isFirstRecharge = productId.startsWith('voxo_first_recharge');
+    if (isFirstRecharge) {
+      await this.prisma.userFirstRecharge.upsert({
+        where: { userId },
+        update: {},
+        create: {
+          userId,
+          productId,
+          coinsGranted: BigInt(reward.coins ?? 0),
+          bonusGranted: BigInt(reward.bonus ?? 0),
+        },
+      }).catch(() => null); // Ignore if already exists
+    }
+
+    // Update daily recharge progress
+    if (totalCoins > 0) {
+      const date = new Date().toISOString().slice(0, 10);
+      await this.prisma.userDailyRechargeProgress.upsert({
+        where: { userId_date: { userId, date } },
+        update: { totalCoins: { increment: totalCoins } },
+        create: { userId, date, totalCoins: BigInt(totalCoins), claimedTiers: [] },
+      }).catch(() => null);
+    }
+
+    const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
+
+    return {
+      success: true,
+      transactionId: tx.id,
+      coinsAdded: reward.coins ?? 0,
+      bonusAdded: reward.bonus ?? 0,
+      diamondsAdded: reward.diamonds ?? 0,
+      newBalance: {
+        coins: wallet?.coins ?? 0,
+        diamonds: wallet?.diamonds ?? 0,
+      },
     };
-
-    await this.prisma.transaction.create({ data: txData });
-
-    if (reward.coins)
-      await this.walletService.addCoins(
-        userId,
-        reward.coins,
-        `Google Play: ${productId}`,
-      );
-    if (reward.diamonds)
-      await this.walletService.addDiamonds(
-        userId,
-        reward.diamonds,
-        `Google Play: ${productId}`,
-      );
-
-    return { success: true, reward };
   }
 
   async getTransactionHistory(userId: string, page = 1, limit = 20) {
@@ -345,6 +397,18 @@ export class PaymentsService {
       meta?.amount || 0,
       pkg.coins,
       transactionId,
+      pkg.bonus ?? 0,
     );
+
+    // Update daily recharge progress for Click/Payme purchases too
+    if (pkg.coins > 0) {
+      const date = new Date().toISOString().slice(0, 10);
+      const totalCoins = pkg.coins + (pkg.bonus ?? 0);
+      await this.prisma.userDailyRechargeProgress.upsert({
+        where: { userId_date: { userId, date } },
+        update: { totalCoins: { increment: totalCoins } },
+        create: { userId, date, totalCoins: BigInt(totalCoins), claimedTiers: [] },
+      }).catch(() => null);
+    }
   }
 }

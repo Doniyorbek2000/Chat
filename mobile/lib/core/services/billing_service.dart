@@ -219,36 +219,33 @@ class BillingService {
 
   /// Verify a purchase with the VOXO backend.
   /// Calls POST /payments/google-play/verify with purchase token.
-  /// Returns true if verification succeeded and the purchase was delivered.
-  Future<bool> verifyPurchase(PurchaseDetails purchase) async {
+  /// Returns verification result map on success, null on failure.
+  Future<Map<String, dynamic>?> verifyPurchase(PurchaseDetails purchase) async {
     try {
       final api = ApiClient.instance;
       final response = await api.post('/payments/google-play/verify', data: {
         'productId': purchase.productID,
-        'purchaseToken': purchase.verificationData.serverVerificationData,
-        'orderId': purchase.purchaseID,
-        'source': purchase.verificationData.source,
+        'token': purchase.verificationData.serverVerificationData,
+        'packageName': 'com.voxo.app',
       });
 
-      final data = response.data['data'] ?? response.data;
-      final verified = data['verified'] as bool? ?? false;
+      final outer = response.data as Map<String, dynamic>? ?? {};
+      final data = (outer['data'] ?? outer) as Map<String, dynamic>? ?? {};
+      final success = data['success'] as bool? ?? false;
 
-      if (verified) {
-        debugPrint(
-            '[BillingService] Purchase verified: ${purchase.productID}');
-        // Complete the purchase on the platform side
+      if (success) {
+        debugPrint('[BillingService] Purchase verified: ${purchase.productID}');
         if (purchase.pendingCompletePurchase) {
           await _iap.completePurchase(purchase);
         }
-        return true;
+        return data;
       } else {
-        debugPrint(
-            '[BillingService] Backend rejected purchase: ${purchase.productID}');
-        return false;
+        debugPrint('[BillingService] Backend rejected purchase: ${purchase.productID}');
+        return null;
       }
     } catch (e) {
       debugPrint('[BillingService] Verification error: $e');
-      return false;
+      return null;
     }
   }
 
@@ -282,8 +279,8 @@ class BillingService {
               '[BillingService] Purchase received: ${purchase.productID}');
           _pendingPurchases
               .removeWhere((p) => p.productID == purchase.productID);
-          final verified = await verifyPurchase(purchase);
-          if (!verified) {
+          final result = await verifyPurchase(purchase);
+          if (result == null) {
             debugPrint(
                 '[BillingService] Verification failed for: ${purchase.productID}');
           }

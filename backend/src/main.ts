@@ -10,6 +10,13 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 
 async function bootstrap() {
+  // Safely serialize BigInt values in JSON responses (Prisma returns BigInt for financial fields).
+  // Values within Number.MAX_SAFE_INTEGER (~9 quadrillion) are emitted as numbers; larger ones as strings.
+  (BigInt.prototype as any).toJSON = function () {
+    const n = Number(this);
+    return Number.isSafeInteger(n) ? n : this.toString();
+  };
+
   const app = await NestFactory.create(AppModule, {
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],
   });

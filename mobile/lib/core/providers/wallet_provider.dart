@@ -4,6 +4,46 @@ import '../network/api_client.dart';
 import '../constants/api_constants.dart';
 import 'auth_provider.dart';
 
+// ---------------------------------------------------------------------------
+// Recharge products provider
+// ---------------------------------------------------------------------------
+
+final rechargeProductsProvider = FutureProvider<List<RechargeProductModel>>((ref) async {
+  final api = ref.watch(apiClientProvider);
+  try {
+    final response = await api.get(ApiConstants.rechargeProducts);
+    final raw = response.data;
+    final list = (raw['data'] ?? raw) as List;
+    return list.map((e) => RechargeProductModel.fromJson(e as Map<String, dynamic>)).toList();
+  } catch (_) {
+    return [];
+  }
+});
+
+final firstRechargeOfferProvider = FutureProvider<FirstRechargeOffer?>((ref) async {
+  final api = ref.watch(apiClientProvider);
+  try {
+    final response = await api.get(ApiConstants.firstRechargeOffer);
+    final raw = response.data;
+    final data = (raw['data'] ?? raw) as Map<String, dynamic>;
+    return FirstRechargeOffer.fromJson(data);
+  } catch (_) {
+    return null;
+  }
+});
+
+final dailyRechargeProvider = FutureProvider<DailyRechargeProgress?>((ref) async {
+  final api = ref.watch(apiClientProvider);
+  try {
+    final response = await api.get(ApiConstants.dailyRecharge);
+    final raw = response.data;
+    final data = (raw['data'] ?? raw) as Map<String, dynamic>;
+    return DailyRechargeProgress.fromJson(data);
+  } catch (_) {
+    return null;
+  }
+});
+
 class WalletNotifier extends StateNotifier<AsyncValue<WalletModel>> {
   final ApiClient _apiClient;
   final Ref _ref;
@@ -117,8 +157,39 @@ class WalletNotifier extends StateNotifier<AsyncValue<WalletModel>> {
         data: {
           'amount': amount,
           'method': method,
-          'accountInfo': accountInfo,
+          'accountNumber': accountInfo,
+          'accountName': accountInfo,
         },
+      );
+      await refreshBalance();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> initiatePayment({
+    required String productId,
+    required String provider,
+    required int amount,
+  }) async {
+    try {
+      final response = await _apiClient.post(
+        ApiConstants.initiatePayment,
+        data: {'packageId': productId, 'provider': provider, 'amount': amount},
+      );
+      final data = response.data as Map<String, dynamic>;
+      return data['data'] ?? data;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<bool> claimDailyRecharge(int tier) async {
+    try {
+      await _apiClient.post(
+        ApiConstants.claimDailyRecharge,
+        data: {'tier': tier},
       );
       await refreshBalance();
       return true;

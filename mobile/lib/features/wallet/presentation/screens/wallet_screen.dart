@@ -20,7 +20,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 3, vsync: this);
+    _tabCtrl = TabController(length: 4, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(walletProvider.notifier).loadWallet();
     });
@@ -40,7 +40,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
       backgroundColor: AppColors.backgroundDark,
       appBar: AppBar(
         backgroundColor: AppColors.backgroundDark,
-        title: const Text('Wallet', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text('Hamyon', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
           onPressed: () => context.pop(),
@@ -60,15 +60,20 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
             children: [
               const Icon(Icons.error_outline, color: Colors.white54, size: 48),
               const SizedBox(height: 12),
-              const Text('Failed to load wallet', style: TextStyle(color: Colors.white54)),
+              const Text('Hamyonni yuklashda xatolik', style: TextStyle(color: Colors.white54)),
               TextButton(
                 onPressed: () => ref.read(walletProvider.notifier).loadWallet(),
-                child: const Text('Retry', style: TextStyle(color: AppColors.primary)),
+                child: const Text('Qayta urinish', style: TextStyle(color: AppColors.primary)),
               ),
             ],
           ),
         ),
-        data: (wallet) => _buildContent(wallet),
+        data: (wallet) => RefreshIndicator(
+          color: AppColors.primary,
+          backgroundColor: AppColors.cardDark,
+          onRefresh: () => ref.read(walletProvider.notifier).loadWallet(),
+          child: _buildContent(wallet),
+        ),
       ),
     );
   }
@@ -78,25 +83,32 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
       children: [
         _buildBalanceCard(wallet),
         _buildActionRow(),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
+        // Daily recharge progress
+        const _DailyRechargeBar(),
+        const SizedBox(height: 4),
         TabBar(
           controller: _tabCtrl,
           indicatorColor: AppColors.primary,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white54,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           tabs: const [
-            Tab(text: 'All'),
-            Tab(text: 'Coins'),
-            Tab(text: 'Diamonds'),
+            Tab(text: 'Tangalar'),
+            Tab(text: 'Olmos'),
+            Tab(text: "O'yin tangalari"),
+            Tab(text: 'Omadli'),
           ],
         ),
         Expanded(
           child: TabBarView(
             controller: _tabCtrl,
             children: [
-              _TransactionsList(type: null),
-              _TransactionsList(type: 'COIN'),
-              _TransactionsList(type: 'DIAMOND'),
+              _TransactionsList(type: 'COINS'),
+              _TransactionsList(type: 'DIAMONDS'),
+              _TransactionsList(type: 'COINS'),   // game coins filter
+              _TransactionsList(type: null),       // lucky/jackpot rewards
             ],
           ),
         ),
@@ -121,7 +133,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
       ),
       child: Column(
         children: [
-          const Text('Total Balance', style: TextStyle(color: Colors.white70, fontSize: 13)),
+          const Text('Mening tangam', style: TextStyle(color: Colors.white70, fontSize: 13)),
           const SizedBox(height: 4),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -130,7 +142,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
             children: [
               const Text('🪙 ', style: TextStyle(fontSize: 20)),
               Text(
-                _formatNumber(wallet.coins),
+                _fmt(wallet.coins),
                 style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold),
               ),
             ],
@@ -139,11 +151,11 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildMiniStat('💎 ${_formatNumber(wallet.diamonds)}', 'Diamonds'),
+              _miniStat('💎 ${_fmt(wallet.diamonds)}', 'Olmos'),
               Container(width: 1, height: 32, color: Colors.white24),
-              _buildMiniStat('🪙 ${_formatNumber(wallet.totalGiftsReceived.toInt())}', 'Earned'),
+              _miniStat('🎁 ${_fmt(wallet.totalGiftsReceived.toInt())}', 'Sovg\'a'),
               Container(width: 1, height: 32, color: Colors.white24),
-              _buildMiniStat('💸 ${_formatNumber(wallet.totalGiftsSent.toInt())}', 'Spent'),
+              _miniStat('💸 ${_fmt(wallet.totalGiftsSent.toInt())}', 'Yuborildi'),
             ],
           ),
         ],
@@ -151,7 +163,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
     ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1);
   }
 
-  Widget _buildMiniStat(String value, String label) {
+  Widget _miniStat(String value, String label) {
     return Column(
       children: [
         Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
@@ -165,32 +177,32 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          _buildActionBtn(
+          _actionBtn(
             icon: Icons.add_circle_outline,
-            label: 'Recharge',
+            label: "To'ldirish",
             color: AppColors.primary,
             onTap: () => context.push('/wallet/recharge'),
           ),
           const SizedBox(width: 12),
-          _buildActionBtn(
+          _actionBtn(
             icon: Icons.swap_horiz,
-            label: 'Transfer',
+            label: "O'tkazish",
             color: AppColors.accent,
-            onTap: () => _showTransferDialog(),
+            onTap: _showTransferDialog,
           ),
           const SizedBox(width: 12),
-          _buildActionBtn(
+          _actionBtn(
             icon: Icons.arrow_upward,
-            label: 'Withdraw',
+            label: 'Yechib olish',
             color: AppColors.secondary,
-            onTap: () => _showWithdrawDialog(),
+            onTap: _showWithdrawDialog,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildActionBtn({
+  Widget _actionBtn({
     required IconData icon,
     required String label,
     required Color color,
@@ -208,9 +220,9 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
           ),
           child: Column(
             children: [
-              Icon(icon, color: color, size: 24),
+              Icon(icon, color: color, size: 22),
               const SizedBox(height: 4),
-              Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600)),
+              Text(label, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600)),
             ],
           ),
         ),
@@ -226,38 +238,17 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
       builder: (_) => AlertDialog(
         backgroundColor: AppColors.surfaceDark,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Transfer Coins', style: TextStyle(color: Colors.white)),
+        title: const Text("Tanga o'tkazish", style: TextStyle(color: Colors.white)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
-              controller: toCtrl,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                labelText: 'User ID',
-                labelStyle: const TextStyle(color: Colors.white54),
-                filled: true,
-                fillColor: AppColors.cardDark,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-              ),
-            ),
+            _inputField(toCtrl, 'Foydalanuvchi ID'),
             const SizedBox(height: 12),
-            TextField(
-              controller: amtCtrl,
-              keyboardType: TextInputType.number,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                labelText: 'Amount',
-                labelStyle: const TextStyle(color: Colors.white54),
-                filled: true,
-                fillColor: AppColors.cardDark,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-              ),
-            ),
+            _inputField(amtCtrl, 'Miqdor', isNumber: true),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Bekor qilish')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
             onPressed: () async {
@@ -269,12 +260,13 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
               );
               if (mounted) {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(ok ? 'Transfer successful!' : 'Transfer failed'), backgroundColor: ok ? AppColors.success : Colors.red),
-                );
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(ok ? "O'tkazma muvaffaqiyatli!" : "O'tkazma amalga oshmadi"),
+                  backgroundColor: ok ? AppColors.success : Colors.red,
+                ));
               }
             },
-            child: const Text('Transfer'),
+            child: const Text("O'tkazish"),
           ),
         ],
       ),
@@ -291,7 +283,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
         builder: (ctx, setSt) => AlertDialog(
           backgroundColor: AppColors.surfaceDark,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Withdraw Diamonds', style: TextStyle(color: Colors.white)),
+          title: const Text('Olmos yechib olish', style: TextStyle(color: Colors.white)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -299,45 +291,18 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
                 value: method,
                 dropdownColor: AppColors.cardDark,
                 style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'Method',
-                  labelStyle: const TextStyle(color: Colors.white54),
-                  filled: true,
-                  fillColor: AppColors.cardDark,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                ),
+                decoration: _inputDecoration("To'lov usuli"),
                 items: ['CLICK', 'PAYME', 'UZUM'].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
                 onChanged: (v) => setSt(() => method = v ?? method),
               ),
               const SizedBox(height: 12),
-              TextField(
-                controller: amtCtrl,
-                keyboardType: TextInputType.number,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'Amount (diamonds, min 100)',
-                  labelStyle: const TextStyle(color: Colors.white54),
-                  filled: true,
-                  fillColor: AppColors.cardDark,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                ),
-              ),
+              _inputField(amtCtrl, 'Miqdor (olmos, min 100)', isNumber: true),
               const SizedBox(height: 12),
-              TextField(
-                controller: accCtrl,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'Account/Phone',
-                  labelStyle: const TextStyle(color: Colors.white54),
-                  filled: true,
-                  fillColor: AppColors.cardDark,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                ),
-              ),
+              _inputField(accCtrl, 'Hisob/Telefon raqam'),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Bekor qilish')),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.secondary),
               onPressed: () async {
@@ -350,12 +315,13 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
                 );
                 if (mounted) {
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(ok ? 'Withdrawal requested!' : 'Request failed'), backgroundColor: ok ? AppColors.success : Colors.red),
-                  );
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(ok ? 'So\'rov yuborildi!' : 'So\'rov amalga oshmadi'),
+                    backgroundColor: ok ? AppColors.success : Colors.red,
+                  ));
                 }
               },
-              child: const Text('Request'),
+              child: const Text('Yuborish'),
             ),
           ],
         ),
@@ -363,12 +329,165 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
     );
   }
 
-  String _formatNumber(num n) {
+  Widget _inputField(TextEditingController ctrl, String label, {bool isNumber = false}) {
+    return TextField(
+      controller: ctrl,
+      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+      style: const TextStyle(color: Colors.white),
+      decoration: _inputDecoration(label),
+    );
+  }
+
+  InputDecoration _inputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: Colors.white54),
+      filled: true,
+      fillColor: AppColors.cardDark,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+    );
+  }
+
+  String _fmt(num n) {
     if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
     if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
     return n.toString();
   }
 }
+
+// ---------------------------------------------------------------------------
+// Daily Recharge Progress Bar widget
+// ---------------------------------------------------------------------------
+
+class _DailyRechargeBar extends ConsumerWidget {
+  const _DailyRechargeBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final progressAsync = ref.watch(dailyRechargeProvider);
+
+    return progressAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (progress) {
+        if (progress == null) return const SizedBox.shrink();
+
+        final thresholds = progress.thresholds;
+        final rewards = progress.rewards;
+        final total = progress.totalCoins;
+        final maxThreshold = thresholds.isNotEmpty ? thresholds.last : 1;
+        final progressRatio = (total / maxThreshold).clamp(0.0, 1.0);
+
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.cardDark,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white10),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text("Kunlik to'lov mukofotlari", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                  Text('${_fmt(total)} / ${_fmt(maxThreshold)}',
+                      style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Progress bar
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: LinearProgressIndicator(
+                  value: progressRatio,
+                  backgroundColor: Colors.white12,
+                  valueColor: const AlwaysStoppedAnimation(AppColors.primary),
+                  minHeight: 8,
+                ),
+              ),
+              const SizedBox(height: 10),
+              // Milestone markers
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: List.generate(thresholds.length, (i) {
+                  final reached = total >= thresholds[i];
+                  final claimed = progress.claimedTiers.contains(i);
+                  final canClaim = reached && !claimed;
+
+                  return GestureDetector(
+                    onTap: canClaim
+                        ? () async {
+                            final ok = await ref.read(walletProvider.notifier).claimDailyRecharge(i);
+                            if (ok && context.mounted) {
+                              ref.invalidate(dailyRechargeProvider);
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Text('+${_fmt(rewards[i])} tanga olindi!'),
+                                backgroundColor: AppColors.success,
+                              ));
+                            }
+                          }
+                        : null,
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: claimed
+                                ? AppColors.success.withOpacity(0.2)
+                                : canClaim
+                                    ? AppColors.primary.withOpacity(0.2)
+                                    : Colors.white10,
+                            border: Border.all(
+                              color: claimed
+                                  ? AppColors.success
+                                  : canClaim
+                                      ? AppColors.primary
+                                      : Colors.white24,
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Center(
+                            child: claimed
+                                ? const Icon(Icons.check, color: AppColors.success, size: 16)
+                                : canClaim
+                                    ? const Icon(Icons.card_giftcard, color: AppColors.primary, size: 14)
+                                    : const Icon(Icons.lock_outline, color: Colors.white38, size: 14),
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text('+${_fmt(rewards[i])}',
+                            style: TextStyle(
+                              color: claimed ? AppColors.success : canClaim ? Colors.white : Colors.white38,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            )),
+                      ],
+                    ),
+                  );
+                }),
+              ),
+            ],
+          ),
+        ).animate().fadeIn(duration: 300.ms);
+      },
+    );
+  }
+
+  String _fmt(num n) {
+    if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(0)}M';
+    if (n >= 1000) return '${(n / 1000).toStringAsFixed(0)}K';
+    return n.toString();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Transactions list
+// ---------------------------------------------------------------------------
 
 class _TransactionsList extends ConsumerStatefulWidget {
   final String? type;
@@ -397,17 +516,26 @@ class _TransactionsListState extends ConsumerState<_TransactionsList> {
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator(color: AppColors.primary));
     if (_items.isEmpty) {
-      return const Center(child: Text('No transactions yet', style: TextStyle(color: Colors.white54)));
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.receipt_long_outlined, color: Colors.white24, size: 48),
+            const SizedBox(height: 12),
+            const Text("Tranzaksiyalar yo'q", style: TextStyle(color: Colors.white54)),
+          ],
+        ),
+      );
     }
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: _items.length,
       separatorBuilder: (_, __) => const Divider(color: Colors.white10, height: 1),
-      itemBuilder: (_, i) => _buildTxItem(_items[i]),
+      itemBuilder: (_, i) => _txItem(_items[i]),
     );
   }
 
-  Widget _buildTxItem(TransactionModel tx) {
+  Widget _txItem(TransactionModel tx) {
     final isCredit = tx.isCredit;
     return ListTile(
       contentPadding: EdgeInsets.zero,
@@ -425,9 +553,10 @@ class _TransactionsListState extends ConsumerState<_TransactionsList> {
         ),
       ),
       title: Text(tx.description ?? tx.type.name, style: const TextStyle(color: Colors.white, fontSize: 13)),
-      subtitle: Text(tx.createdAt.toLocal().toString().substring(0, 16), style: const TextStyle(color: Colors.white38, fontSize: 11)),
+      subtitle: Text(tx.createdAt.toLocal().toString().substring(0, 16),
+          style: const TextStyle(color: Colors.white38, fontSize: 11)),
       trailing: Text(
-        '${isCredit ? '+' : '-'}${tx.amount}',
+        '${isCredit ? '+' : ''}${tx.amount}',
         style: TextStyle(
           color: isCredit ? AppColors.success : Colors.red,
           fontWeight: FontWeight.bold,

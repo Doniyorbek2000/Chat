@@ -45,7 +45,7 @@ export class WalletService {
 
     try {
       const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
-      const before = wallet?.coins || 0;
+      const before = wallet?.coins ?? BigInt(0);
 
       const [updated] = await this.prisma.$transaction([
         this.prisma.wallet.update({
@@ -57,9 +57,9 @@ export class WalletService {
             userId,
             type: TransactionType.REWARD,
             currency: Currency.COINS,
-            amount,
+            amount: BigInt(amount),
             balanceBefore: before,
-            balanceAfter: Number(before) + amount,
+            balanceAfter: before + BigInt(amount),
             description,
             referenceId,
             status: TransactionStatus.COMPLETED,
@@ -84,7 +84,7 @@ export class WalletService {
 
     try {
       const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
-      if (!wallet || wallet.coins < amount) {
+      if (!wallet || wallet.coins < BigInt(amount)) {
         throw new BadRequestException('Insufficient coins');
       }
 
@@ -98,9 +98,9 @@ export class WalletService {
             userId,
             type: TransactionType.GIFT_SEND,
             currency: Currency.COINS,
-            amount: -amount,
+            amount: -BigInt(amount),
             balanceBefore: wallet.coins,
-            balanceAfter: Number(wallet.coins) - amount,
+            balanceAfter: wallet.coins - BigInt(amount),
             description,
             referenceId,
             status: TransactionStatus.COMPLETED,
@@ -130,7 +130,7 @@ export class WalletService {
 
     try {
       const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
-      const before = wallet?.diamonds || 0;
+      const before = wallet?.diamonds ?? BigInt(0);
 
       const [updated] = await this.prisma.$transaction([
         this.prisma.wallet.update({
@@ -145,9 +145,9 @@ export class WalletService {
             userId,
             type: TransactionType.GIFT_RECEIVE,
             currency: Currency.DIAMONDS,
-            amount,
+            amount: BigInt(amount),
             balanceBefore: before,
-            balanceAfter: Number(before) + amount,
+            balanceAfter: before + BigInt(amount),
             description,
             referenceId,
             status: TransactionStatus.COMPLETED,
@@ -163,7 +163,7 @@ export class WalletService {
 
   async deductDiamonds(userId: string, amount: number, description: string) {
     const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
-    if (!wallet || wallet.diamonds < amount) {
+    if (!wallet || wallet.diamonds < BigInt(amount)) {
       throw new BadRequestException('Insufficient diamonds');
     }
 
@@ -188,7 +188,7 @@ export class WalletService {
       const wallet = await this.prisma.wallet.findUnique({
         where: { userId: senderId },
       });
-      if (!wallet || wallet.coins < amount)
+      if (!wallet || wallet.coins < BigInt(amount))
         throw new BadRequestException('Insufficient coins');
 
       await this.prisma.$transaction([
@@ -205,9 +205,9 @@ export class WalletService {
             userId: senderId,
             type: TransactionType.TRANSFER,
             currency,
-            amount: -amount,
-            balanceBefore: Number(wallet.coins),
-            balanceAfter: Number(wallet.coins) - amount,
+            amount: -BigInt(amount),
+            balanceBefore: wallet.coins,
+            balanceAfter: wallet.coins - BigInt(amount),
             description: `Transfer to ${receiverUid}`,
             referenceId: receiver.id,
             status: TransactionStatus.COMPLETED,
@@ -218,9 +218,9 @@ export class WalletService {
             userId: receiver.id,
             type: TransactionType.TRANSFER,
             currency,
-            amount,
-            balanceBefore: 0,
-            balanceAfter: amount,
+            amount: BigInt(amount),
+            balanceBefore: BigInt(0),
+            balanceAfter: BigInt(amount),
             description: `Received from sender`,
             referenceId: senderId,
             status: TransactionStatus.COMPLETED,
@@ -250,7 +250,7 @@ export class WalletService {
     const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
     const MIN_WITHDRAW = 100;
 
-    if (!wallet || wallet.diamonds < dto.amount)
+    if (!wallet || wallet.diamonds < BigInt(dto.amount))
       throw new BadRequestException('Insufficient diamonds');
     if (dto.amount < MIN_WITHDRAW)
       throw new BadRequestException(
@@ -288,12 +288,17 @@ export class WalletService {
     amount: number,
     coins: number,
     referenceId: string,
+    bonusCoins = 0,
   ) {
+    const totalCoins = coins + bonusCoins;
+    const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
+    const before = wallet?.coins ?? BigInt(0);
+
     await this.prisma.$transaction([
       this.prisma.wallet.update({
         where: { userId },
         data: {
-          coins: { increment: coins },
+          coins: { increment: totalCoins },
           totalRecharge: { increment: amount },
         },
       }),
@@ -302,17 +307,17 @@ export class WalletService {
           userId,
           type: TransactionType.RECHARGE,
           currency: Currency.COINS,
-          amount: coins,
-          balanceBefore: 0,
-          balanceAfter: coins,
-          description: `Recharge ${coins} coins`,
+          amount: BigInt(totalCoins),
+          balanceBefore: before,
+          balanceAfter: before + BigInt(totalCoins),
+          description: `Recharge ${coins} coins${bonusCoins > 0 ? ` + ${bonusCoins} bonus` : ''}`,
           referenceId,
           status: TransactionStatus.COMPLETED,
         },
       }),
     ]);
 
-    return { message: 'Recharge successful', coins };
+    return { message: 'Recharge successful', coins, bonusCoins, totalCoins };
   }
 
   async getRechargeProducts() {

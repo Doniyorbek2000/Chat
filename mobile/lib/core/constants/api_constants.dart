@@ -60,13 +60,23 @@ class ApiConstants {
   static const String giftHistory = '/gifts/history';
 
   // Wallet
-  static const String wallet = '/wallet';
+  static const String wallet = '/wallet/me';
+  static const String walletBalance = '/wallet/balance';
   static const String transactions = '/wallet/transactions';
-  static const String recharge = '/wallet/recharge';
   static const String transfer = '/wallet/transfer';
   static const String withdraw = '/wallet/withdraw';
   static const String withdrawRequests = '/wallet/withdraw-requests';
   static const String paymentMethods = '/wallet/payment-methods';
+  static const String rechargeProducts = '/wallet/recharge-products';
+  static const String firstRechargeOffer = '/wallet/first-recharge-offer';
+  static const String dailyRecharge = '/wallet/daily-recharge';
+  static const String claimDailyRecharge = '/wallet/daily-recharge/claim';
+
+  // Payments
+  static const String initiatePayment = '/payments/initiate';
+  static const String recharge = '/payments/initiate';
+  static const String paymentHistory = '/payments/history';
+  static const String googlePlayVerify = '/payments/google-play/verify';
 
   // VIP
   static const String vipPackages = '/vip/packages';

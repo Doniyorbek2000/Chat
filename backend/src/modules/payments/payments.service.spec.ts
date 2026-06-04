@@ -4,9 +4,10 @@ import { PaymentsService } from './payments.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { WalletService } from '../wallet/wallet.service';
 import { ConfigService } from '@nestjs/config';
-import { TransactionStatus } from '@prisma/client';
 
 // ==================== MOCKS ====================
+
+const mockWallet = { coins: BigInt(5000), diamonds: BigInt(10) };
 
 const mockPrismaService = {
   transaction: {
@@ -17,6 +18,15 @@ const mockPrismaService = {
     updateMany: jest.fn(),
     findMany: jest.fn(),
     count: jest.fn(),
+  },
+  wallet: {
+    findUnique: jest.fn(),
+  },
+  userFirstRecharge: {
+    upsert: jest.fn().mockResolvedValue({}),
+  },
+  userDailyRechargeProgress: {
+    upsert: jest.fn().mockResolvedValue({}),
   },
 };
 
@@ -47,6 +57,11 @@ describe('PaymentsService — Google Play dedup', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
 
+    // Default: wallet exists for balance fetch
+    mockPrismaService.wallet.findUnique.mockResolvedValue(mockWallet);
+    mockPrismaService.userFirstRecharge.upsert.mockResolvedValue({});
+    mockPrismaService.userDailyRechargeProgress.upsert.mockResolvedValue({});
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PaymentsService,
@@ -60,10 +75,7 @@ describe('PaymentsService — Google Play dedup', () => {
   });
 
   it('uses findUnique (not findFirst) for duplicate token check', async () => {
-    // Simulate token already exists
-    mockPrismaService.transaction.findUnique.mockResolvedValue({
-      id: 'existing-tx',
-    });
+    mockPrismaService.transaction.findUnique.mockResolvedValue({ id: 'existing-tx' });
 
     const result = await service.verifyGooglePlayPurchase('user-1', {
       token: 'already-used-token',
@@ -71,9 +83,9 @@ describe('PaymentsService — Google Play dedup', () => {
       packageName: 'com.voxo.app',
     });
 
-    expect(result).toEqual({ success: true, alreadyProcessed: true });
+    expect(result.success).toBe(true);
+    expect(result.alreadyProcessed).toBe(true);
 
-    // Must use findUnique with googlePlayToken field — NOT findFirst with metadata path
     expect(mockPrismaService.transaction.findUnique).toHaveBeenCalledWith({
       where: { googlePlayToken: 'already-used-token' },
     });
@@ -81,9 +93,7 @@ describe('PaymentsService — Google Play dedup', () => {
   });
 
   it('returns alreadyProcessed without calling wallet service on duplicate', async () => {
-    mockPrismaService.transaction.findUnique.mockResolvedValue({
-      id: 'existing-tx',
-    });
+    mockPrismaService.transaction.findUnique.mockResolvedValue({ id: 'existing-tx' });
 
     await service.verifyGooglePlayPurchase('user-1', {
       token: 'dup-token',
@@ -96,7 +106,7 @@ describe('PaymentsService — Google Play dedup', () => {
   });
 
   it('stores googlePlayToken as top-level field, not inside metadata', async () => {
-    mockPrismaService.transaction.findUnique.mockResolvedValue(null); // not a duplicate
+    mockPrismaService.transaction.findUnique.mockResolvedValue(null);
     mockPrismaService.transaction.create.mockResolvedValue({ id: 'new-tx' });
     mockWalletService.addCoins.mockResolvedValue({});
 
@@ -106,21 +116,14 @@ describe('PaymentsService — Google Play dedup', () => {
       packageName: 'com.voxo.app',
     });
 
-    const createCall =
-      mockPrismaService.transaction.create.mock.calls[0][0].data;
-
-    // googlePlayToken must be a top-level field
+    const createCall = mockPrismaService.transaction.create.mock.calls[0][0].data;
     expect(createCall.googlePlayToken).toBe('new-unique-token');
-
-    // token must NOT be inside metadata (it's in the DB field now)
     expect(createCall.metadata?.googlePlayToken).toBeUndefined();
-
-    // other metadata still present
     expect(createCall.metadata?.productId).toBe('voxo_coins_small');
     expect(createCall.metadata?.packageName).toBe('com.voxo.app');
   });
 
-  it('credits coins for coin products', async () => {
+  it('credits coins for coin products and returns enriched response', async () => {
     mockPrismaService.transaction.findUnique.mockResolvedValue(null);
     mockPrismaService.transaction.create.mockResolvedValue({ id: 'tx-1' });
     mockWalletService.addCoins.mockResolvedValue({});
@@ -131,16 +134,22 @@ describe('PaymentsService — Google Play dedup', () => {
       packageName: 'com.voxo.app',
     });
 
-    expect(result).toEqual({ success: true, reward: { coins: 100 } });
+    expect(result.success).toBe(true);
+    expect(result.coinsAdded).toBe(100);
+    expect(result.diamondsAdded).toBe(0);
+    expect(result.newBalance).toBeDefined();
+
+    // addCoins called with (userId, totalCoins, description, txId)
     expect(mockWalletService.addCoins).toHaveBeenCalledWith(
       'user-1',
       100,
       'Google Play: voxo_coins_small',
+      'tx-1',
     );
     expect(mockWalletService.addDiamonds).not.toHaveBeenCalled();
   });
 
-  it('credits diamonds for diamond products', async () => {
+  it('credits diamonds for diamond products and returns enriched response', async () => {
     mockPrismaService.transaction.findUnique.mockResolvedValue(null);
     mockPrismaService.transaction.create.mockResolvedValue({ id: 'tx-2' });
     mockWalletService.addDiamonds.mockResolvedValue({});
@@ -151,11 +160,16 @@ describe('PaymentsService — Google Play dedup', () => {
       packageName: 'com.voxo.app',
     });
 
-    expect(result).toEqual({ success: true, reward: { diamonds: 200 } });
+    expect(result.success).toBe(true);
+    expect(result.diamondsAdded).toBe(200);
+    expect(result.coinsAdded).toBe(0);
+    expect(result.newBalance).toBeDefined();
+
     expect(mockWalletService.addDiamonds).toHaveBeenCalledWith(
       'user-1',
       200,
       'Google Play: voxo_diamonds_medium',
+      'tx-2',
     );
   });
 
