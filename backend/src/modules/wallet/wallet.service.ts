@@ -123,7 +123,9 @@ export class WalletService {
     const lockKey = `wallet:diamonds:add:${userId}`;
     const acquired = await this.redis.set(lockKey, '1', 'EX', 5, 'NX');
     if (!acquired) {
-      throw new BadRequestException('Wallet operation in progress, please retry');
+      throw new BadRequestException(
+        'Wallet operation in progress, please retry',
+      );
     }
 
     try {

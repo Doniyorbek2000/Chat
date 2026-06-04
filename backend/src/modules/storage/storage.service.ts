@@ -9,7 +9,12 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { v4 as uuidv4 } from 'uuid';
 
-const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const ALLOWED_IMAGE_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+];
 const DEFAULT_MAX_SIZE_MB = 5;
 
 @Injectable()
@@ -36,7 +41,10 @@ export class StorageService {
 
   private validateImageFile(buffer: Buffer, contentType: string): void {
     const maxBytes =
-      (this.configService.get<number>('upload.maxSizeMb') ?? DEFAULT_MAX_SIZE_MB) * 1024 * 1024;
+      (this.configService.get<number>('upload.maxSizeMb') ??
+        DEFAULT_MAX_SIZE_MB) *
+      1024 *
+      1024;
 
     if (!ALLOWED_IMAGE_TYPES.includes(contentType)) {
       throw new BadRequestException(
@@ -110,7 +118,8 @@ export class StorageService {
     originalName: string,
     contentType?: string,
   ): Promise<string> {
-    const mimeType = contentType || `image/${originalName.split('.').pop() || 'jpeg'}`;
+    const mimeType =
+      contentType || `image/${originalName.split('.').pop() || 'jpeg'}`;
     this.validateImageFile(buffer, mimeType);
     const ext = originalName.split('.').pop() || 'jpg';
     const key = `avatars/${userId}/${uuidv4()}.${ext}`;
@@ -145,7 +154,8 @@ export class StorageService {
     originalName: string,
     contentType?: string,
   ): Promise<string> {
-    const mimeType = contentType || `image/${originalName.split('.').pop() || 'jpeg'}`;
+    const mimeType =
+      contentType || `image/${originalName.split('.').pop() || 'jpeg'}`;
     this.validateImageFile(buffer, mimeType);
     const ext = originalName.split('.').pop() || 'jpg';
     const key = `rooms/${roomId}/cover.${ext}`;

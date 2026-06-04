@@ -5,7 +5,6 @@ import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../../prisma/prisma.service';
 
-
 // ==================== MOCKS ====================
 
 const mockPrismaService = {
@@ -79,7 +78,10 @@ describe('AuthService', () => {
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: mockConfigService },
-        { provide: 'default_IORedisModuleConnectionToken', useValue: mockRedis },
+        {
+          provide: 'default_IORedisModuleConnectionToken',
+          useValue: mockRedis,
+        },
       ],
     }).compile();
 

@@ -243,9 +243,14 @@ export class RoomsGateway
       if (!userId) throw new WsException('Unauthorized');
 
       // Verify user is a member of this room (joined via room:join)
-      const isMember = await this.redis.sismember(`room_users:${data.roomId}`, userId);
+      const isMember = await this.redis.sismember(
+        `room_users:${data.roomId}`,
+        userId,
+      );
       if (!isMember) {
-        client.emit('error', { message: 'You must join the room before taking a seat' });
+        client.emit('error', {
+          message: 'You must join the room before taking a seat',
+        });
         return;
       }
 

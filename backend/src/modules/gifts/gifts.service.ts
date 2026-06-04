@@ -49,12 +49,17 @@ export class GiftsService {
     const dedupeKey = `gift:send:${senderId}:${dto.giftId}:${dto.receiverId ?? ''}:${dto.roomId ?? ''}`;
     const acquired = await this.redis.set(dedupeKey, '1', 'EX', 10, 'NX');
     if (!acquired) {
-      throw new BadRequestException('Gift send in progress, please wait a moment');
+      throw new BadRequestException(
+        'Gift send in progress, please wait a moment',
+      );
     }
 
     try {
-      const gift = await this.prisma.gift.findUnique({ where: { id: dto.giftId } });
-      if (!gift || !gift.isActive) throw new NotFoundException('Gift not found');
+      const gift = await this.prisma.gift.findUnique({
+        where: { id: dto.giftId },
+      });
+      if (!gift || !gift.isActive)
+        throw new NotFoundException('Gift not found');
 
       const quantity = dto.quantity || 1;
       const totalCoins = gift.coinPrice * quantity;
@@ -64,14 +69,18 @@ export class GiftsService {
       if (gift.category === 'LUCKY') {
         multiplier = [1, 2, 5, 10][Math.floor(Math.random() * 4)];
       }
-      const totalDiamonds = Math.floor(totalCoins * 0.7) * multiplier || gift.diamondPrice * quantity * multiplier;
+      const totalDiamonds =
+        Math.floor(totalCoins * 0.7) * multiplier ||
+        gift.diamondPrice * quantity * multiplier;
 
       // Single atomic Prisma interactive transaction covering all wallet + record ops
       const result = await this.prisma.$transaction(
         async (tx) => {
           // 1. Check & deduct sender coins
           if (totalCoins > 0) {
-            const senderWallet = await tx.wallet.findUnique({ where: { userId: senderId } });
+            const senderWallet = await tx.wallet.findUnique({
+              where: { userId: senderId },
+            });
             if (!senderWallet || senderWallet.coins < totalCoins) {
               throw new BadRequestException('Insufficient coins');
             }
@@ -152,7 +161,12 @@ export class GiftsService {
                 },
               },
               receiver: {
-                select: { id: true, uid: true, displayName: true, avatar: true },
+                select: {
+                  id: true,
+                  uid: true,
+                  displayName: true,
+                  avatar: true,
+                },
               },
             },
           });
@@ -182,7 +196,8 @@ export class GiftsService {
     page = 1,
     limit = 20,
   ) {
-    const where = type === 'sent' ? { senderId: userId } : { receiverId: userId };
+    const where =
+      type === 'sent' ? { senderId: userId } : { receiverId: userId };
 
     const [data, total] = await Promise.all([
       this.prisma.giftTransaction.findMany({
