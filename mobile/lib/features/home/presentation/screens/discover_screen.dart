@@ -8,6 +8,9 @@ import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
+import '../../../../core/constants/api_constants.dart';
+import '../../../../core/network/api_client.dart';
+import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../widgets/room_card_widget.dart';
@@ -27,53 +30,52 @@ final _isSearchExpandedProvider = StateProvider<bool>((ref) => false);
 
 final _discoverRoomsProvider =
     StateNotifierProvider<_DiscoverRoomsNotifier, AsyncValue<List<Map<String, dynamic>>>>(
-        (ref) => _DiscoverRoomsNotifier());
+        (ref) => _DiscoverRoomsNotifier(ref.watch(apiClientProvider)));
 
 class _DiscoverRoomsNotifier
     extends StateNotifier<AsyncValue<List<Map<String, dynamic>>>> {
-  _DiscoverRoomsNotifier() : super(const AsyncValue.loading()) {
+  final ApiClient _api;
+
+  _DiscoverRoomsNotifier(this._api) : super(const AsyncValue.loading()) {
     load();
   }
 
-  Future<void> load() async {
+  Future<void> load({String? category, String? search}) async {
     state = const AsyncValue.loading();
-    await Future.delayed(const Duration(milliseconds: 800));
-    state = AsyncValue.data(_mockRooms());
+    try {
+      final response = await _api.get(
+        ApiConstants.rooms,
+        queryParameters: {
+          'limit': 30,
+          if (category != null && category != 'all') 'type': category.toUpperCase(),
+          if (search != null && search.isNotEmpty) 'search': search,
+        },
+      );
+      final raw = response.data as Map<String, dynamic>;
+      final items = ((raw['data'] ?? raw['items'] ?? raw) as List? ?? []);
+      state = AsyncValue.data(items.map(_mapRoom).toList());
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
   }
 
-  Future<void> refresh() async {
-    await Future.delayed(const Duration(milliseconds: 600));
-    state = AsyncValue.data(_mockRooms());
-  }
+  Future<void> refresh() => load();
 
-  List<Map<String, dynamic>> _mockRooms() {
-    return List.generate(12, (i) => {
-          'id': 'room_$i',
-          'title': _titles[i % _titles.length],
-          'cover': 'https://picsum.photos/seed/room$i/400/300',
-          'hostName': 'Host ${i + 1}',
-          'hostAvatar': 'https://api.dicebear.com/7.x/avataaars/png?seed=host$i',
-          'viewerCount': (i + 1) * 47 + i * 13,
-          'isVip': i % 3 == 0,
-          'isLive': true,
-          'category': RoomCategory.values[i % RoomCategory.values.length].name,
-        });
+  Map<String, dynamic> _mapRoom(dynamic item) {
+    final r = item as Map<String, dynamic>;
+    final host = r['host'] as Map<String, dynamic>? ?? {};
+    return {
+      'id': r['id'],
+      'title': r['title'] ?? 'Room',
+      'cover': r['coverImage'],
+      'hostName': host['displayName'] ?? 'Host',
+      'hostAvatar': host['avatar'],
+      'viewerCount': r['viewerCount'] ?? 0,
+      'isVip': r['type'] == 'VIP',
+      'isLive': r['isLive'] ?? true,
+      'category': (r['type'] as String? ?? 'PUBLIC').toLowerCase(),
+    };
   }
-
-  static const _titles = [
-    'Chill Vibes Only',
-    'Music & Talk',
-    'Night Lounge',
-    'Language Exchange',
-    'Gaming Zone',
-    'Study Session',
-    'Late Night Crew',
-    'Poetry Corner',
-    'Business Talk',
-    'Fitness Motivation',
-    'Comedy Hour',
-    'Travel Stories',
-  ];
 }
 
 // ---------------------------------------------------------------------------

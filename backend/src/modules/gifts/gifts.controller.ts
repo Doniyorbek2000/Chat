@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { GiftsService } from './gifts.service';
 import { SendGiftDto } from './dto/gift.dto';
@@ -20,6 +20,11 @@ export class GiftsController {
   @Get('categories')
   getGiftsByCategory() {
     return this.giftsService.getGiftsByCategory();
+  }
+
+  @Get('jackpot')
+  getJackpotPool() {
+    return this.giftsService.getJackpotPool();
   }
 
   @Post('send')
@@ -48,5 +53,13 @@ export class GiftsController {
     @Query('limit') limit = 10,
   ) {
     return this.giftsService.getTopReceivers(roomId, +limit);
+  }
+
+  @Get(':giftId/lucky-rounds')
+  getLuckyRoundHistory(
+    @Param('giftId') giftId: string,
+    @Query('limit') limit = 10,
+  ) {
+    return this.giftsService.getLuckyRoundHistory(giftId, +limit);
   }
 }

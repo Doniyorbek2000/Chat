@@ -87,7 +87,7 @@ class _RoomScreenState extends ConsumerState<RoomScreen>
       backgroundColor: Colors.transparent,
       builder: (_) => GiftPanel(
         roomId: widget.roomId,
-        hostId: room?.host.id,
+        receiverId: room?.host.id ?? '',
         onClose: () => Navigator.of(context).pop(),
       ),
     );

@@ -255,6 +255,9 @@ model User {
   auditLogs            AuditLog[]            @relation("AdminAuditLogs")
   firstRecharge        UserFirstRecharge?
   dailyRechargeProgress UserDailyRechargeProgress[]
+  luckyEntries         LuckyGiftEntry[]
+  luckyResults         LuckyGiftResult[]     @relation("LuckyResultWinner")
+  jackpotWins          JackpotWinner[]
 
   @@index([phone])
   @@index([email])
@@ -441,6 +444,7 @@ model Gift {
 
   transactions   GiftTransaction[]
   luckyConfig    LuckyGiftConfig?
+  luckyRounds    LuckyGiftRound[]
 
   @@index([category])
   @@index([isActive])
@@ -1041,5 +1045,91 @@ model JackpotPool {
   lastWonCoins  BigInt?
   updatedAt     DateTime @updatedAt
 
+  winners JackpotWinner[]
+
   @@map("jackpot_pool")
+}
+
+// ==================== LUCKY GIFT ROUNDS ====================
+
+model LuckyGiftRound {
+  id           String    @id @default(cuid())
+  giftId       String
+  isActive     Boolean   @default(true)
+  totalPool    BigInt    @default(0)
+  entryCount   Int       @default(0)
+  endedAt      DateTime?
+  createdAt    DateTime  @default(now())
+
+  gift    Gift             @relation(fields: [giftId], references: [id])
+  entries LuckyGiftEntry[]
+  result  LuckyGiftResult?
+
+  @@index([giftId])
+  @@index([isActive])
+  @@map("lucky_gift_rounds")
+}
+
+model LuckyGiftEntry {
+  id           String   @id @default(cuid())
+  roundId      String
+  userId       String
+  coinsWagered BigInt
+  createdAt    DateTime @default(now())
+
+  round LuckyGiftRound @relation(fields: [roundId], references: [id])
+  user  User           @relation(fields: [userId], references: [id])
+
+  @@index([roundId])
+  @@index([userId])
+  @@map("lucky_gift_entries")
+}
+
+model LuckyGiftResult {
+  id             String   @id @default(cuid())
+  roundId        String   @unique
+  winnerId       String?
+  winnerCoins    BigInt   @default(0)
+  multiplier     Float
+  serverSeed     String
+  serverSeedHash String
+  nonce          Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  round  LuckyGiftRound @relation(fields: [roundId], references: [id])
+  winner User?          @relation("LuckyResultWinner", fields: [winnerId], references: [id])
+
+  @@map("lucky_gift_results")
+}
+
+model JackpotWinner {
+  id        String   @id @default(cuid())
+  userId    String
+  poolId    String
+  coinsWon  BigInt
+  createdAt DateTime @default(now())
+
+  user User        @relation(fields: [userId], references: [id])
+  pool JackpotPool @relation(fields: [poolId], references: [id])
+
+  @@index([userId])
+  @@map("jackpot_winners")
+}
+
+// ==================== ENTRANCE EFFECTS ====================
+
+model EntranceEffect {
+  id           String   @id @default(cuid())
+  name         String
+  animationUrl String
+  previewUrl   String?
+  coinPrice    Int
+  duration     Int      @default(30)
+  isActive     Boolean  @default(true)
+  minVipLevel  Int      @default(0)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  @@index([isActive])
+  @@map("entrance_effects")
 }

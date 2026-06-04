@@ -21,6 +21,7 @@ const mockGift = {
   diamondPrice: 0,
   category: 'NORMAL',
   isActive: true,
+  luckyConfig: null,
 };
 
 const mockSenderWallet = {
@@ -36,10 +37,15 @@ const mockReceiverWallet = {
 
 const mockTx = {
   gift: { findUnique: jest.fn() },
-  wallet: { findUnique: jest.fn(), update: jest.fn() },
+  wallet: { findUnique: jest.fn(), update: jest.fn(), upsert: jest.fn() },
   transaction: { create: jest.fn() },
   giftTransaction: { create: jest.fn() },
   voiceRoom: { update: jest.fn() },
+  jackpotPool: { findFirst: jest.fn().mockResolvedValue(null), update: jest.fn() },
+  jackpotWinner: { create: jest.fn() },
+  luckyGiftRound: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({ id: 'round-1' }), update: jest.fn() },
+  luckyGiftEntry: { create: jest.fn() },
+  luckyGiftResult: { upsert: jest.fn() },
 };
 
 const mockPrismaService = {
@@ -62,6 +68,17 @@ describe('GiftsService', () => {
   beforeEach(async () => {
     // Re-apply after resetMocks: true clears all implementations
     (ioredis.Redis as unknown as jest.Mock).mockImplementation(() => mockRedis);
+
+    // Reset new tx mocks to safe defaults
+    mockTx.wallet.upsert.mockResolvedValue({});
+    mockTx.jackpotPool.findFirst.mockResolvedValue(null);
+    mockTx.jackpotPool.update.mockResolvedValue({});
+    mockTx.jackpotWinner.create.mockResolvedValue({});
+    mockTx.luckyGiftRound.findFirst.mockResolvedValue(null);
+    mockTx.luckyGiftRound.create.mockResolvedValue({ id: 'round-1' });
+    mockTx.luckyGiftRound.update.mockResolvedValue({});
+    mockTx.luckyGiftEntry.create.mockResolvedValue({});
+    mockTx.luckyGiftResult.upsert.mockResolvedValue({});
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -254,7 +271,7 @@ describe('GiftsService', () => {
       });
 
       expect(capturedData[0].multiplier).toBeGreaterThanOrEqual(1);
-      expect([1, 2, 5, 10]).toContain(capturedData[0].multiplier);
+      expect(capturedData[0].multiplier).toBeLessThanOrEqual(10);
     });
 
     it('NORMAL category gift has multiplier = 1', async () => {
@@ -372,7 +389,7 @@ describe('GiftsService', () => {
 
       expect(mockTx.voiceRoom.update).toHaveBeenCalledWith({
         where: { id: 'room-1' },
-        data: { totalGifts: { increment: 100 } },
+        data: { totalGifts: { increment: BigInt(100) } },
       });
     });
   });

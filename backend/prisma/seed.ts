@@ -227,46 +227,143 @@ async function seedGifts() {
   console.log('Seeding gifts...');
 
   const gifts = [
-    // LOVE (using NORMAL category as closest match)
-    { name: 'Rose', category: GiftCategory.NORMAL, type: GiftType.STATIC, imageUrl: 'https://cdn.voxo.app/gifts/rose.png', coinPrice: 10, diamondPrice: 10, sortOrder: 1 },
-    { name: 'Heart', category: GiftCategory.NORMAL, type: GiftType.LOTTIE, imageUrl: 'https://cdn.voxo.app/gifts/heart.png', coinPrice: 20, diamondPrice: 20, sortOrder: 2 },
-    { name: 'Wedding Ring', category: GiftCategory.COUPLE, type: GiftType.SVGA, imageUrl: 'https://cdn.voxo.app/gifts/wedding-ring.png', coinPrice: 100, diamondPrice: 100, sortOrder: 3 },
-    { name: 'Love Letter', category: GiftCategory.NORMAL, type: GiftType.STATIC, imageUrl: 'https://cdn.voxo.app/gifts/love-letter.png', coinPrice: 15, diamondPrice: 15, sortOrder: 4 },
-    { name: 'Teddy Bear', category: GiftCategory.NORMAL, type: GiftType.LOTTIE, imageUrl: 'https://cdn.voxo.app/gifts/teddy-bear.png', coinPrice: 50, diamondPrice: 50, sortOrder: 5 },
+    // ===== NORMAL (cheap daily gifts) =====
+    { name: 'Rose', category: GiftCategory.NORMAL, type: GiftType.STATIC, imageUrl: 'https://cdn.voxo.app/gifts/rose.png', coinPrice: 10, sortOrder: 1 },
+    { name: 'Heart', category: GiftCategory.NORMAL, type: GiftType.LOTTIE, imageUrl: 'https://cdn.voxo.app/gifts/heart.png', coinPrice: 20, sortOrder: 2 },
+    { name: 'Love Letter', category: GiftCategory.NORMAL, type: GiftType.STATIC, imageUrl: 'https://cdn.voxo.app/gifts/love-letter.png', coinPrice: 15, sortOrder: 3 },
+    { name: 'Teddy Bear', category: GiftCategory.NORMAL, type: GiftType.LOTTIE, imageUrl: 'https://cdn.voxo.app/gifts/teddy-bear.png', coinPrice: 50, sortOrder: 4 },
+    { name: 'Balloon', category: GiftCategory.NORMAL, type: GiftType.LOTTIE, imageUrl: 'https://cdn.voxo.app/gifts/balloon.png', coinPrice: 8, sortOrder: 5 },
+    { name: 'Candy', category: GiftCategory.NORMAL, type: GiftType.STATIC, imageUrl: 'https://cdn.voxo.app/gifts/candy.png', coinPrice: 5, sortOrder: 6 },
+    { name: 'Star', category: GiftCategory.NORMAL, type: GiftType.LOTTIE, imageUrl: 'https://cdn.voxo.app/gifts/star.png', coinPrice: 12, sortOrder: 7 },
+    { name: 'Flower Bouquet', category: GiftCategory.NORMAL, type: GiftType.SVGA, imageUrl: 'https://cdn.voxo.app/gifts/bouquet.png', coinPrice: 30, sortOrder: 8 },
+    { name: 'Thumbs Up', category: GiftCategory.NORMAL, type: GiftType.STATIC, imageUrl: 'https://cdn.voxo.app/gifts/thumbsup.png', coinPrice: 3, sortOrder: 9 },
+    { name: 'Mic', category: GiftCategory.NORMAL, type: GiftType.STATIC, imageUrl: 'https://cdn.voxo.app/gifts/mic.png', coinPrice: 7, sortOrder: 10 },
 
-    // LUXURY
-    { name: 'Sports Car', category: GiftCategory.LUXURY, type: GiftType.SVGA, imageUrl: 'https://cdn.voxo.app/gifts/sports-car.png', coinPrice: 500, diamondPrice: 500, sortOrder: 10 },
-    { name: 'Yacht', category: GiftCategory.LUXURY, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/yacht.png', coinPrice: 1000, diamondPrice: 1000, sortOrder: 11 },
-    { name: 'Private Jet', category: GiftCategory.LUXURY, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/private-jet.png', coinPrice: 2000, diamondPrice: 2000, sortOrder: 12 },
-    { name: 'Diamond Ring', category: GiftCategory.LUXURY, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/diamond-ring.png', coinPrice: 5000, diamondPrice: 5000, sortOrder: 13 },
+    // ===== LUXURY (mid-tier) =====
+    { name: 'Sports Car', category: GiftCategory.LUXURY, type: GiftType.SVGA, imageUrl: 'https://cdn.voxo.app/gifts/sports-car.png', coinPrice: 500, sortOrder: 20 },
+    { name: 'Yacht', category: GiftCategory.LUXURY, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/yacht.png', coinPrice: 1000, sortOrder: 21 },
+    { name: 'Private Jet', category: GiftCategory.LUXURY, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/private-jet.png', coinPrice: 2000, sortOrder: 22 },
+    { name: 'Diamond Ring', category: GiftCategory.LUXURY, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/diamond-ring.png', coinPrice: 5000, sortOrder: 23 },
+    { name: 'Champagne', category: GiftCategory.LUXURY, type: GiftType.SVGA, imageUrl: 'https://cdn.voxo.app/gifts/champagne.png', coinPrice: 80, sortOrder: 24 },
+    { name: 'Gold Bar', category: GiftCategory.LUXURY, type: GiftType.LOTTIE, imageUrl: 'https://cdn.voxo.app/gifts/gold-bar.png', coinPrice: 300, sortOrder: 25 },
+    { name: 'Castle', category: GiftCategory.LUXURY, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/castle.png', coinPrice: 3000, sortOrder: 26 },
+    { name: 'Rolex', category: GiftCategory.LUXURY, type: GiftType.SVGA, imageUrl: 'https://cdn.voxo.app/gifts/rolex.png', coinPrice: 800, sortOrder: 27 },
 
-    // FOOD / LUCKY category (closest match)
-    { name: 'Ice Cream', category: GiftCategory.LUCKY, type: GiftType.STATIC, imageUrl: 'https://cdn.voxo.app/gifts/ice-cream.png', coinPrice: 5, diamondPrice: 5, sortOrder: 20 },
-    { name: 'Birthday Cake', category: GiftCategory.LUCKY, type: GiftType.LOTTIE, imageUrl: 'https://cdn.voxo.app/gifts/birthday-cake.png', coinPrice: 30, diamondPrice: 30, sortOrder: 21 },
-    { name: 'Champagne', category: GiftCategory.LUXURY, type: GiftType.SVGA, imageUrl: 'https://cdn.voxo.app/gifts/champagne.png', coinPrice: 80, diamondPrice: 80, sortOrder: 22 },
+    // ===== VIP =====
+    { name: 'Galaxy', category: GiftCategory.VIP, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/galaxy.png', coinPrice: 8888, sortOrder: 30 },
+    { name: 'Universe', category: GiftCategory.VIP, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/universe.png', coinPrice: 30000, sortOrder: 31 },
+    { name: 'Crown', category: GiftCategory.VIP, type: GiftType.SVGA, imageUrl: 'https://cdn.voxo.app/gifts/crown.png', coinPrice: 2000, sortOrder: 32 },
+    { name: 'Dragon', category: GiftCategory.VIP, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/dragon.png', coinPrice: 10000, sortOrder: 33 },
+    { name: 'Unicorn', category: GiftCategory.VIP, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/unicorn.png', coinPrice: 5000, sortOrder: 34 },
+    { name: 'Space Rocket', category: GiftCategory.VIP, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/space-rocket.png', coinPrice: 50000, sortOrder: 35 },
 
-    // FUN / FAMILY category
-    { name: 'Bomb', category: GiftCategory.FAMILY, type: GiftType.LOTTIE, imageUrl: 'https://cdn.voxo.app/gifts/bomb.png', coinPrice: 25, diamondPrice: 25, sortOrder: 30 },
-    { name: 'Fireworks', category: GiftCategory.FAMILY, type: GiftType.SVGA, imageUrl: 'https://cdn.voxo.app/gifts/fireworks.png', coinPrice: 60, diamondPrice: 60, sortOrder: 31 },
-    { name: 'Rainbow', category: GiftCategory.FAMILY, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/rainbow.png', coinPrice: 150, diamondPrice: 150, sortOrder: 32 },
+    // ===== LUCKY (server-side multiplier) =====
+    { name: 'Lucky Bag', category: GiftCategory.LUCKY, type: GiftType.LOTTIE, imageUrl: 'https://cdn.voxo.app/gifts/lucky-bag.png', coinPrice: 100, sortOrder: 40 },
+    { name: 'Lucky Box', category: GiftCategory.LUCKY, type: GiftType.SVGA, imageUrl: 'https://cdn.voxo.app/gifts/lucky-box.png', coinPrice: 500, sortOrder: 41 },
+    { name: 'Fortune Wheel', category: GiftCategory.LUCKY, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/fortune-wheel.png', coinPrice: 1000, sortOrder: 42 },
+    { name: 'Lucky Star', category: GiftCategory.LUCKY, type: GiftType.LOTTIE, imageUrl: 'https://cdn.voxo.app/gifts/lucky-star.png', coinPrice: 200, sortOrder: 43 },
 
-    // SPECIAL / VIP category
-    { name: 'Galaxy', category: GiftCategory.VIP, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/galaxy.png', coinPrice: 300, diamondPrice: 300, sortOrder: 40 },
-    { name: 'Universe', category: GiftCategory.VIP, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/universe.png', coinPrice: 999, diamondPrice: 999, sortOrder: 41 },
-    { name: 'Crown', category: GiftCategory.VIP, type: GiftType.SVGA, imageUrl: 'https://cdn.voxo.app/gifts/crown.png', coinPrice: 200, diamondPrice: 200, sortOrder: 42 },
-    { name: 'Dragon', category: GiftCategory.VIP, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/dragon.png', coinPrice: 800, diamondPrice: 800, sortOrder: 43 },
-    { name: 'Unicorn', category: GiftCategory.VIP, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/unicorn.png', coinPrice: 400, diamondPrice: 400, sortOrder: 44 },
+    // ===== LUCKY FRUIT (server-side multiplier) =====
+    { name: 'Apple', category: GiftCategory.LUCKY_FRUIT, type: GiftType.LOTTIE, imageUrl: 'https://cdn.voxo.app/gifts/apple.png', coinPrice: 50, sortOrder: 50 },
+    { name: 'Watermelon', category: GiftCategory.LUCKY_FRUIT, type: GiftType.LOTTIE, imageUrl: 'https://cdn.voxo.app/gifts/watermelon.png', coinPrice: 80, sortOrder: 51 },
+    { name: 'Cherry', category: GiftCategory.LUCKY_FRUIT, type: GiftType.STATIC, imageUrl: 'https://cdn.voxo.app/gifts/cherry.png', coinPrice: 30, sortOrder: 52 },
+    { name: 'Lemon', category: GiftCategory.LUCKY_FRUIT, type: GiftType.STATIC, imageUrl: 'https://cdn.voxo.app/gifts/lemon.png', coinPrice: 20, sortOrder: 53 },
+    { name: 'Grape', category: GiftCategory.LUCKY_FRUIT, type: GiftType.LOTTIE, imageUrl: 'https://cdn.voxo.app/gifts/grape.png', coinPrice: 40, sortOrder: 54 },
+    { name: 'Strawberry', category: GiftCategory.LUCKY_FRUIT, type: GiftType.LOTTIE, imageUrl: 'https://cdn.voxo.app/gifts/strawberry.png', coinPrice: 35, sortOrder: 55 },
+
+    // ===== COUPLE =====
+    { name: 'Wedding Ring', category: GiftCategory.COUPLE, type: GiftType.SVGA, imageUrl: 'https://cdn.voxo.app/gifts/wedding-ring.png', coinPrice: 1000, sortOrder: 60 },
+    { name: 'Couple Locket', category: GiftCategory.COUPLE, type: GiftType.LOTTIE, imageUrl: 'https://cdn.voxo.app/gifts/couple-locket.png', coinPrice: 200, sortOrder: 61 },
+    { name: 'Love Boat', category: GiftCategory.COUPLE, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/love-boat.png', coinPrice: 3000, sortOrder: 62 },
+    { name: 'Couple Dance', category: GiftCategory.COUPLE, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/couple-dance.png', coinPrice: 5000, sortOrder: 63 },
+
+    // ===== RELATIONSHIP =====
+    { name: 'Forever Rose', category: GiftCategory.RELATIONSHIP, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/forever-rose.png', coinPrice: 2000, sortOrder: 70 },
+    { name: 'Heart Lock', category: GiftCategory.RELATIONSHIP, type: GiftType.SVGA, imageUrl: 'https://cdn.voxo.app/gifts/heart-lock.png', coinPrice: 500, sortOrder: 71 },
+    { name: 'Infinite Love', category: GiftCategory.RELATIONSHIP, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/infinite-love.png', coinPrice: 10000, sortOrder: 72 },
+    { name: 'Soul Mate', category: GiftCategory.RELATIONSHIP, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/soul-mate.png', coinPrice: 20000, sortOrder: 73 },
+
+    // ===== ARISTOCRACY =====
+    { name: 'Royal Crown', category: GiftCategory.ARISTOCRACY, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/royal-crown.png', coinPrice: 50000, sortOrder: 80 },
+    { name: 'Diamond Throne', category: GiftCategory.ARISTOCRACY, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/diamond-throne.png', coinPrice: 100000, sortOrder: 81 },
+    { name: 'Imperial Palace', category: GiftCategory.ARISTOCRACY, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/imperial-palace.png', coinPrice: 200000, sortOrder: 82 },
+    { name: 'God of Wealth', category: GiftCategory.ARISTOCRACY, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/god-wealth.png', coinPrice: 500000, sortOrder: 83 },
+
+    // ===== NATION =====
+    { name: 'Uzbekistan Flag', category: GiftCategory.NATION, type: GiftType.SVGA, imageUrl: 'https://cdn.voxo.app/gifts/flag-uz.png', coinPrice: 100, sortOrder: 90 },
+    { name: 'Silk Road', category: GiftCategory.NATION, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/silk-road.png', coinPrice: 500, sortOrder: 91 },
+    { name: 'Samarkand', category: GiftCategory.NATION, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/samarkand.png', coinPrice: 1000, sortOrder: 92 },
+
+    // ===== FAMILY =====
+    { name: 'Family Shield', category: GiftCategory.FAMILY, type: GiftType.SVGA, imageUrl: 'https://cdn.voxo.app/gifts/family-shield.png', coinPrice: 300, sortOrder: 100 },
+    { name: 'Fireworks', category: GiftCategory.FAMILY, type: GiftType.SVGA, imageUrl: 'https://cdn.voxo.app/gifts/fireworks.png', coinPrice: 60, sortOrder: 101 },
+    { name: 'Family Castle', category: GiftCategory.FAMILY, type: GiftType.FULLSCREEN, imageUrl: 'https://cdn.voxo.app/gifts/family-castle.png', coinPrice: 5000, sortOrder: 102 },
   ];
 
+  let created = 0;
   for (const gift of gifts) {
-    // Use upsert by name (no unique constraint, so findFirst + create pattern)
     const existing = await prisma.gift.findFirst({ where: { name: gift.name } });
     if (!existing) {
-      await prisma.gift.create({ data: { ...gift, isActive: true } });
+      await prisma.gift.create({ data: { ...gift, diamondPrice: Math.floor(gift.coinPrice * 0.7), isActive: true } });
+      created++;
     }
   }
 
-  console.log(`  Seeded ${gifts.length} gifts.`);
+  console.log(`  Seeded ${created} new gifts (${gifts.length} total defined).`);
+  return gifts.length;
+}
+
+async function seedLuckyGiftConfigs() {
+  console.log('Seeding lucky gift configs...');
+
+  const luckyGifts = await prisma.gift.findMany({
+    where: { category: { in: ['LUCKY', 'LUCKY_FRUIT'] } },
+  });
+
+  let created = 0;
+  for (const gift of luckyGifts) {
+    const existing = await prisma.luckyGiftConfig.findUnique({ where: { giftId: gift.id } });
+    if (!existing) {
+      await prisma.luckyGiftConfig.create({
+        data: {
+          giftId: gift.id,
+          isActive: true,
+          minMultiplier: 1,
+          maxMultiplier: gift.category === 'LUCKY' ? 10 : 5,
+          jackpotChanceBps: 100,    // 1% jackpot chance
+          poolContributionBps: 500, // 5% to jackpot pool
+          houseEdgeBps: 300,        // 3% house edge
+          maxWinCoins: BigInt(gift.coinPrice * 100),
+        },
+      });
+      created++;
+    }
+  }
+
+  console.log(`  Seeded ${created} lucky gift configs.`);
+}
+
+async function seedEntranceEffects() {
+  console.log('Seeding entrance effects...');
+
+  const effects = [
+    { name: 'Bronze Entry', animationUrl: 'https://cdn.voxo.app/effects/bronze-entry.svga', coinPrice: 500, duration: 30, minVipLevel: 1, sortOrder: 1 },
+    { name: 'Silver Entry', animationUrl: 'https://cdn.voxo.app/effects/silver-entry.svga', coinPrice: 1000, duration: 30, minVipLevel: 2, sortOrder: 2 },
+    { name: 'Gold Entry', animationUrl: 'https://cdn.voxo.app/effects/gold-entry.svga', coinPrice: 2000, duration: 30, minVipLevel: 3, sortOrder: 3 },
+    { name: 'Diamond Entry', animationUrl: 'https://cdn.voxo.app/effects/diamond-entry.svga', coinPrice: 5000, duration: 30, minVipLevel: 4, sortOrder: 4 },
+    { name: 'Legendary Entry', animationUrl: 'https://cdn.voxo.app/effects/legendary-entry.svga', coinPrice: 10000, duration: 30, minVipLevel: 5, sortOrder: 5 },
+  ];
+
+  let created = 0;
+  for (const effect of effects) {
+    const existing = await prisma.entranceEffect.findFirst({ where: { name: effect.name } });
+    if (!existing) {
+      await prisma.entranceEffect.create({ data: { ...effect, isActive: true } });
+      created++;
+    }
+  }
+
+  console.log(`  Seeded ${created} entrance effects.`);
 }
 
 async function seedVehicles() {
@@ -644,6 +741,12 @@ async function main() {
 
   // Seed gifts
   await seedGifts();
+
+  // Seed lucky gift configs (depends on gifts)
+  await seedLuckyGiftConfigs();
+
+  // Seed entrance effects
+  await seedEntranceEffects();
 
   // Seed vehicles
   await seedVehicles();
