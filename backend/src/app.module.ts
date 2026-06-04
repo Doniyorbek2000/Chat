@@ -27,6 +27,12 @@ import { AdminModule } from './modules/admin/admin.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { VehiclesModule } from './modules/vehicles/vehicles.module';
 import { ZegocloudModule } from './modules/zegocloud/zegocloud.module';
+import { NobleModule } from './modules/noble/noble.module';
+import { MedalsModule } from './modules/medals/medals.module';
+import { ShopModule } from './modules/shop/shop.module';
+import { NameplatesModule } from './modules/nameplates/nameplates.module';
+import { RoomThemesModule } from './modules/room-themes/room-themes.module';
+import { CollectionModule } from './modules/collection/collection.module';
 
 @Module({
   imports: [
@@ -83,6 +89,12 @@ import { ZegocloudModule } from './modules/zegocloud/zegocloud.module';
     PaymentsModule,
     VehiclesModule,
     ZegocloudModule,
+    NobleModule,
+    MedalsModule,
+    ShopModule,
+    NameplatesModule,
+    RoomThemesModule,
+    CollectionModule,
   ],
 })
 export class AppModule {}

@@ -191,4 +191,122 @@ export class AdminController {
   ) {
     return this.adminService.getAuditLogs(page, limit);
   }
+
+  // ==================== NOBLE PLANS ====================
+
+  @Get('noble/plans')
+  getNoblePlans() {
+    return this.adminService.getNoblePlans();
+  }
+
+  @Post('noble/plans')
+  createNoblePlan(@Body() data: any) {
+    return this.adminService.createNoblePlan(data);
+  }
+
+  @Patch('noble/plans/:id')
+  updateNoblePlan(@Param('id') id: string, @Body() data: any) {
+    return this.adminService.updateNoblePlan(id, data);
+  }
+
+  @Delete('noble/plans/:id')
+  deleteNoblePlan(@Param('id') id: string) {
+    return this.adminService.deleteNoblePlan(id);
+  }
+
+  // ==================== MEDALS (ADMIN) ====================
+
+  @Get('medals')
+  getMedalsAdmin(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page = 1,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit = 20,
+    @Query('category') category?: string,
+  ) {
+    return this.adminService.getMedalsAdmin({ page, limit, category });
+  }
+
+  @Post('medals')
+  createMedal(@Body() data: any) {
+    return this.adminService.createMedal(data);
+  }
+
+  @Patch('medals/:id')
+  updateMedal(@Param('id') id: string, @Body() data: any) {
+    return this.adminService.updateMedal(id, data);
+  }
+
+  @Delete('medals/:id')
+  deleteMedal(@Param('id') id: string) {
+    return this.adminService.deleteMedal(id);
+  }
+
+  // ==================== SHOP ITEMS (ADMIN) ====================
+
+  @Get('shop/items')
+  getShopItems(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page = 1,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit = 20,
+    @Query('category') category?: string,
+  ) {
+    return this.adminService.getShopItems({ page, limit, category });
+  }
+
+  @Post('shop/items')
+  createShopItem(@Body() data: any) {
+    return this.adminService.createShopItem(data);
+  }
+
+  @Patch('shop/items/:id')
+  updateShopItem(@Param('id') id: string, @Body() data: any) {
+    return this.adminService.updateShopItem(id, data);
+  }
+
+  @Delete('shop/items/:id')
+  deleteShopItem(@Param('id') id: string) {
+    return this.adminService.deleteShopItem(id);
+  }
+
+  // ==================== ROOM THEMES (ADMIN) ====================
+
+  @Get('room-themes')
+  getRoomThemesAdmin() {
+    return this.adminService.getRoomThemesAdmin();
+  }
+
+  @Post('room-themes')
+  createRoomTheme(@Body() data: any) {
+    return this.adminService.createRoomTheme(data);
+  }
+
+  @Patch('room-themes/:id')
+  updateRoomTheme(@Param('id') id: string, @Body() data: any) {
+    return this.adminService.updateRoomTheme(id, data);
+  }
+
+  @Delete('room-themes/:id')
+  deleteRoomTheme(@Param('id') id: string) {
+    return this.adminService.deleteRoomTheme(id);
+  }
+
+  // ==================== NAMEPLATES (ADMIN) ====================
+
+  @Get('nameplates')
+  getNameplatesAdmin() {
+    return this.adminService.getNameplatesAdmin();
+  }
+
+  @Post('nameplates')
+  createNameplate(@Body() data: any) {
+    return this.adminService.createNameplate(data);
+  }
+
+  @Patch('nameplates/:id')
+  updateNameplate(@Param('id') id: string, @Body() data: any) {
+    return this.adminService.updateNameplate(id, data);
+  }
+
+  @Delete('nameplates/:id')
+  deleteNameplate(@Param('id') id: string) {
+    return this.adminService.deleteNameplate(id);
+  }
 }

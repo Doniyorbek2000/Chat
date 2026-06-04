@@ -700,6 +700,124 @@ export class AdminService {
     }));
   }
 
+  // ==================== NOBLE ====================
+
+  async getNoblePlans() {
+    return this.prisma.noblePlan.findMany({ orderBy: { sortOrder: 'asc' } });
+  }
+
+  async createNoblePlan(data: any) {
+    return this.prisma.noblePlan.create({ data });
+  }
+
+  async updateNoblePlan(id: string, data: any) {
+    return this.prisma.noblePlan.update({ where: { id }, data });
+  }
+
+  async deleteNoblePlan(id: string) {
+    return this.prisma.noblePlan.delete({ where: { id } });
+  }
+
+  // ==================== MEDALS (ADMIN) ====================
+
+  async getMedalsAdmin(params: { page?: number; limit?: number; category?: string } = {}) {
+    const { page = 1, limit = 20, category } = params;
+    const where: any = {};
+    if (category) where.category = category;
+
+    const [data, total] = await Promise.all([
+      this.prisma.medal.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: [{ category: 'asc' }, { sortOrder: 'asc' }],
+      }),
+      this.prisma.medal.count({ where }),
+    ]);
+
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async createMedal(data: any) {
+    return this.prisma.medal.create({ data });
+  }
+
+  async updateMedal(id: string, data: any) {
+    return this.prisma.medal.update({ where: { id }, data });
+  }
+
+  async deleteMedal(id: string) {
+    return this.prisma.medal.delete({ where: { id } });
+  }
+
+  // ==================== SHOP ITEMS (ADMIN) ====================
+
+  async getShopItems(params: { page?: number; limit?: number; category?: string } = {}) {
+    const { page = 1, limit = 20, category } = params;
+    const where: any = {};
+    if (category) where.category = category;
+
+    const [data, total] = await Promise.all([
+      this.prisma.shopItem.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: [{ category: 'asc' }, { sortOrder: 'asc' }],
+      }),
+      this.prisma.shopItem.count({ where }),
+    ]);
+
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async createShopItem(data: any) {
+    return this.prisma.shopItem.create({ data });
+  }
+
+  async updateShopItem(id: string, data: any) {
+    return this.prisma.shopItem.update({ where: { id }, data });
+  }
+
+  async deleteShopItem(id: string) {
+    return this.prisma.shopItem.delete({ where: { id } });
+  }
+
+  // ==================== ROOM THEMES (ADMIN) ====================
+
+  async getRoomThemesAdmin() {
+    return this.prisma.roomTheme.findMany({ orderBy: { sortOrder: 'asc' } });
+  }
+
+  async createRoomTheme(data: any) {
+    return this.prisma.roomTheme.create({ data });
+  }
+
+  async updateRoomTheme(id: string, data: any) {
+    return this.prisma.roomTheme.update({ where: { id }, data });
+  }
+
+  async deleteRoomTheme(id: string) {
+    return this.prisma.roomTheme.delete({ where: { id } });
+  }
+
+  // ==================== NAMEPLATES (ADMIN) ====================
+
+  async getNameplatesAdmin() {
+    return this.prisma.nameplate.findMany({ orderBy: { sortOrder: 'asc' } });
+  }
+
+  async createNameplate(data: any) {
+    return this.prisma.nameplate.create({ data });
+  }
+
+  async updateNameplate(id: string, data: any) {
+    return this.prisma.nameplate.update({ where: { id }, data });
+  }
+
+  async deleteNameplate(id: string) {
+    return this.prisma.nameplate.delete({ where: { id } });
+  }
+
   // ==================== HELPERS ====================
 
   private async createAuditLog(
