@@ -322,27 +322,29 @@ export class PaymentsService {
   }
 
   private async _completePurchase(transactionId: string, userId: string) {
+    // Atomic status flip — only one concurrent call can succeed (PENDING → COMPLETED)
+    const updated = await this.prisma.transaction.updateMany({
+      where: { id: transactionId, status: TransactionStatus.PENDING },
+      data: { status: TransactionStatus.COMPLETED },
+    });
+
+    // If count === 0, another request already processed it — idempotent early return
+    if (updated.count === 0) return;
+
     const transaction = await this.prisma.transaction.findUnique({
       where: { id: transactionId },
     });
-    if (!transaction || transaction.status !== TransactionStatus.PENDING)
-      return;
+    if (!transaction) return;
 
     const meta = transaction.metadata as any;
     const pkg = COIN_PACKAGES[meta?.packageId];
     if (!pkg) return;
 
-    await Promise.all([
-      this.walletService.processRecharge(
-        userId,
-        meta?.amount || 0,
-        pkg.coins,
-        transactionId,
-      ),
-      this.prisma.transaction.update({
-        where: { id: transactionId },
-        data: { status: TransactionStatus.COMPLETED },
-      }),
-    ]);
+    await this.walletService.processRecharge(
+      userId,
+      meta?.amount || 0,
+      pkg.coins,
+      transactionId,
+    );
   }
 }

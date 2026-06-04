@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { WalletService } from './wallet.service';
 import { TransferDto, WithdrawDto } from './dto/wallet.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -11,6 +11,11 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 @Controller('wallet')
 export class WalletController {
   constructor(private walletService: WalletService) {}
+
+  @Get('me')
+  getMe(@CurrentUser() user: any) {
+    return this.walletService.getBalance(user.id);
+  }
 
   @Get('balance')
   getBalance(@CurrentUser() user: any) {
@@ -24,6 +29,26 @@ export class WalletController {
     @Query('limit') limit = 20,
   ) {
     return this.walletService.getTransactionHistory(user.id, +page, +limit);
+  }
+
+  @Get('recharge-products')
+  getRechargeProducts() {
+    return this.walletService.getRechargeProducts();
+  }
+
+  @Get('first-recharge-offer')
+  getFirstRechargeOffer(@CurrentUser() user: any) {
+    return this.walletService.getFirstRechargeOffer(user.id);
+  }
+
+  @Get('daily-recharge')
+  getDailyRecharge(@CurrentUser() user: any) {
+    return this.walletService.getDailyRechargeProgress(user.id);
+  }
+
+  @Post('daily-recharge/claim')
+  claimDailyRecharge(@CurrentUser() user: any, @Body('tier') tier: number) {
+    return this.walletService.claimDailyRecharge(user.id, tier);
   }
 
   @Post('transfer')

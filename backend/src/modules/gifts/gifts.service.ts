@@ -8,6 +8,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { SendGiftDto } from './dto/gift.dto';
 import { TransactionType, Currency, TransactionStatus } from '@prisma/client';
 import * as Redis from 'ioredis';
+import { randomInt } from 'crypto';
 
 @Injectable()
 export class GiftsService {
@@ -64,10 +65,10 @@ export class GiftsService {
       const quantity = dto.quantity || 1;
       const totalCoins = gift.coinPrice * quantity;
 
-      // Lucky gift: multiplier computed server-side only
+      // Lucky gift: multiplier computed server-side with cryptographic randomness
       let multiplier = 1;
       if (gift.category === 'LUCKY') {
-        multiplier = [1, 2, 5, 10][Math.floor(Math.random() * 4)];
+        multiplier = [1, 2, 5, 10][randomInt(0, 4)];
       }
       const totalDiamonds =
         Math.floor(totalCoins * 0.7) * multiplier ||

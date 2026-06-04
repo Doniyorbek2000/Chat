@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createColumnHelper } from '@tanstack/react-table'
 import {
   CheckCircleIcon,
@@ -29,72 +29,59 @@ const methodLabels: Record<string, string> = {
   crypto: 'Crypto',
 }
 
-const mockWithdrawals: Withdrawal[] = Array.from({ length: 60 }, (_, i) => ({
-  id: `w-${i}`,
-  userId: `user-${i % 15}`,
-  user: {
-    id: `user-${i % 15}`,
-    uid: `U${10000 + i}`,
-    username: `user${i % 15}`,
-    displayName: `User ${i % 15}`,
-    avatar: undefined,
-    level: 20,
-    vipLevel: (i % 5) as 0 | 1 | 2 | 3 | 4,
-    exp: 0,
-    coins: 0,
-    diamonds: 0,
-    status: 'active' as const,
-    isOnline: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    totalRecharged: 0,
-    totalWithdrawn: 0,
-    followersCount: 0,
-    followingCount: 0,
-    totalGiftsSent: 0,
-    totalGiftsReceived: 0,
-  },
-  amount: Math.floor(Math.random() * 50000) + 1000,
-  currency: 'USD',
-  method: (['bank_transfer', 'paypal', 'alipay', 'wechat', 'crypto'] as const)[i % 5],
-  accountInfo: {
-    account: i % 5 === 0 ? `****${String(1000 + i).slice(-4)}` : `user${i % 15}@example.com`,
-    name: `User ${i % 15}`,
-  },
-  status: (['pending', 'pending', 'processing', 'approved', 'rejected'] as const)[i % 5],
-  fee: Math.floor(Math.random() * 50) + 5,
-  netAmount: Math.floor(Math.random() * 49000) + 950,
-  requestedAt: new Date(Date.now() - i * 3600000 * 6).toISOString(),
-  processedAt: i % 5 >= 2 ? new Date(Date.now() - i * 3600000 * 2).toISOString() : undefined,
-}))
-
 export default function WithdrawalsPage() {
   const [activeTab, setActiveTab] = useState<WithdrawalTabStatus>('pending')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
-  const [loading, setLoading] = useState(false)
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([])
+  const [total, setTotal] = useState(0)
+  const [tabCounts, setTabCounts] = useState({ pending: 0, processing: 0, approved: 0, rejected: 0 })
+  const [dataLoading, setDataLoading] = useState(true)
   const [approveTarget, setApproveTarget] = useState<Withdrawal | null>(null)
   const [rejectTarget, setRejectTarget] = useState<Withdrawal | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [rejectError, setRejectError] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
 
-  const tabCounts = {
-    pending: mockWithdrawals.filter(w => w.status === 'pending').length,
-    processing: mockWithdrawals.filter(w => w.status === 'processing').length,
-    approved: mockWithdrawals.filter(w => w.status === 'approved').length,
-    rejected: mockWithdrawals.filter(w => w.status === 'rejected').length,
-  }
+  const loadWithdrawals = useCallback(async () => {
+    setDataLoading(true)
+    try {
+      const res = await api.getWithdrawals({ status: activeTab, page, limit: pageSize })
+      setWithdrawals(res.data)
+      setTotal(res.total)
+    } catch {
+      toast.error('Failed to load withdrawals')
+    } finally {
+      setDataLoading(false)
+    }
+  }, [activeTab, page, pageSize])
 
-  const pendingAmount = mockWithdrawals
-    .filter(w => w.status === 'pending')
-    .reduce((sum, w) => sum + w.amount, 0)
+  const loadTabCounts = useCallback(async () => {
+    try {
+      const [pending, processing, approved, rejected] = await Promise.all([
+        api.getWithdrawals({ status: 'pending', limit: 1 }),
+        api.getWithdrawals({ status: 'processing', limit: 1 }),
+        api.getWithdrawals({ status: 'approved', limit: 1 }),
+        api.getWithdrawals({ status: 'rejected', limit: 1 }),
+      ])
+      setTabCounts({
+        pending: pending.total,
+        processing: processing.total,
+        approved: approved.total,
+        rejected: rejected.total,
+      })
+    } catch {
+      // non-critical, silently fail
+    }
+  }, [])
 
-  const todayCompleted = mockWithdrawals.filter(w => w.status === 'approved').length
-  const monthTotal = mockWithdrawals.filter(w => ['approved'].includes(w.status)).reduce((s, w) => s + w.netAmount, 0)
+  useEffect(() => {
+    loadWithdrawals()
+  }, [loadWithdrawals])
 
-  const filtered = mockWithdrawals.filter(w => w.status === activeTab)
-  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
+  useEffect(() => {
+    loadTabCounts()
+  }, [loadTabCounts])
 
   const handleApprove = async () => {
     if (!approveTarget) return
@@ -103,6 +90,9 @@ export default function WithdrawalsPage() {
       await api.approveWithdrawal(approveTarget.id)
       toast.success('Withdrawal approved and set to Processing')
       setApproveTarget(null)
+      setWithdrawals(prev => prev.filter(w => w.id !== approveTarget.id))
+      setTotal(prev => Math.max(0, prev - 1))
+      setTabCounts(prev => ({ ...prev, pending: Math.max(0, prev.pending - 1), processing: prev.processing + 1 }))
     } catch {
       toast.error('Failed to approve withdrawal')
     } finally {
@@ -120,6 +110,9 @@ export default function WithdrawalsPage() {
     try {
       await api.rejectWithdrawal(rejectTarget.id, rejectReason)
       toast.success('Withdrawal rejected')
+      setWithdrawals(prev => prev.filter(w => w.id !== rejectTarget.id))
+      setTotal(prev => Math.max(0, prev - 1))
+      setTabCounts(prev => ({ ...prev, [activeTab]: Math.max(0, prev[activeTab] - 1), rejected: prev.rejected + 1 }))
       setRejectTarget(null)
       setRejectReason('')
       setRejectError('')
@@ -238,9 +231,9 @@ export default function WithdrawalsPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
           { label: 'Pending Count', value: tabCounts.pending, color: 'text-yellow-400', icon: ClockIcon },
-          { label: 'Pending Amount', value: `💎 ${formatNumber(pendingAmount)}`, color: 'text-blue-400', icon: BanknotesIcon },
-          { label: 'Today Completed', value: todayCompleted, color: 'text-green-400', icon: CheckCircleIcon },
-          { label: 'Month Total', value: `$${formatNumber(monthTotal)}`, color: 'text-purple-400', icon: BanknotesIcon },
+          { label: 'Processing', value: tabCounts.processing, color: 'text-blue-400', icon: BanknotesIcon },
+          { label: 'Completed', value: tabCounts.approved, color: 'text-green-400', icon: CheckCircleIcon },
+          { label: 'Rejected', value: tabCounts.rejected, color: 'text-red-400', icon: XCircleIcon },
         ].map((stat) => (
           <div key={stat.label} className="card py-4">
             <div className="flex items-center gap-3">
@@ -281,10 +274,10 @@ export default function WithdrawalsPage() {
           </div>
         </div>
         <DataTable
-          data={paginated}
+          data={withdrawals}
           columns={columns}
-          loading={loading}
-          total={filtered.length}
+          loading={dataLoading}
+          total={total}
           page={page}
           pageSize={pageSize}
           onPageChange={setPage}

@@ -102,7 +102,7 @@ export class AdminController {
     return this.adminService.getWithdrawals(status, page, limit);
   }
 
-  @Put('withdrawals/:id/approve')
+  @Post('withdrawals/:id/approve')
   approveWithdrawal(
     @CurrentUser('id') adminId: string,
     @Param('id') withdrawalId: string,
@@ -110,13 +110,22 @@ export class AdminController {
     return this.adminService.approveWithdrawal(adminId, withdrawalId);
   }
 
-  @Put('withdrawals/:id/reject')
+  @Post('withdrawals/:id/reject')
   rejectWithdrawal(
     @CurrentUser('id') adminId: string,
     @Param('id') withdrawalId: string,
     @Body() dto: RejectWithdrawalDto,
   ) {
     return this.adminService.rejectWithdrawal(adminId, withdrawalId, dto);
+  }
+
+  @Post('withdrawals/:id/mark-paid')
+  markWithdrawalPaid(
+    @CurrentUser('id') adminId: string,
+    @Param('id') withdrawalId: string,
+    @Body('txId') txId?: string,
+  ) {
+    return this.adminService.markWithdrawalPaid(adminId, withdrawalId, txId);
   }
 
   // ==================== GIFTS ====================

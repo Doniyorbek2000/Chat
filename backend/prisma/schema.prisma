@@ -59,6 +59,10 @@ enum GiftCategory {
   LUCKY
   VIP
   NATION
+  LUCKY_FRUIT
+  RELATIONSHIP
+  ARISTOCRACY
+  CUSTOMIZE
 }
 
 enum GiftType {
@@ -249,6 +253,8 @@ model User {
   resolvedReports      Report[]              @relation("ReportResolver")
   processedWithdrawals Withdrawal[]          @relation("WithdrawalProcessor")
   auditLogs            AuditLog[]            @relation("AdminAuditLogs")
+  firstRecharge        UserFirstRecharge?
+  dailyRechargeProgress UserDailyRechargeProgress[]
 
   @@index([phone])
   @@index([email])
@@ -433,7 +439,8 @@ model Gift {
   isActive      Boolean      @default(true)
   sortOrder     Int          @default(0)
 
-  transactions GiftTransaction[]
+  transactions   GiftTransaction[]
+  luckyConfig    LuckyGiftConfig?
 
   @@index([category])
   @@index([isActive])
@@ -949,4 +956,90 @@ model AuditLog {
   @@index([targetType, targetId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// ==================== WALLET / BILLING ====================
+
+enum RechargeProductType {
+  COINS
+  DIAMONDS
+  FIRST_RECHARGE
+}
+
+model RechargeProduct {
+  id                String              @id @default(cuid())
+  productId         String              @unique
+  title             String
+  type              RechargeProductType
+  baseAmount        BigInt
+  bonusAmount       BigInt              @default(0)
+  priceUzs          Int
+  isFirstRechargeOnly Boolean           @default(false)
+  isActive          Boolean             @default(true)
+  sortOrder         Int                 @default(0)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([type])
+  @@index([isActive])
+  @@map("recharge_products")
+}
+
+model UserFirstRecharge {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  usedAt      DateTime @default(now())
+  productId   String
+  coinsGranted BigInt
+  bonusGranted BigInt  @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_first_recharges")
+}
+
+model UserDailyRechargeProgress {
+  id          String   @id @default(cuid())
+  userId      String
+  date        String
+  totalCoins  BigInt   @default(0)
+  claimedTiers Json    @default("[]")
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@map("user_daily_recharge_progress")
+}
+
+// ==================== LUCKY GIFT / JACKPOT ====================
+
+model LuckyGiftConfig {
+  id                  String   @id @default(cuid())
+  giftId              String   @unique
+  isActive            Boolean  @default(true)
+  minMultiplier       Int      @default(1)
+  maxMultiplier       Int      @default(10)
+  jackpotChanceBps    Int      @default(100)
+  poolContributionBps Int      @default(500)
+  houseEdgeBps        Int      @default(300)
+  maxWinCoins         BigInt   @default(1000000)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  gift Gift @relation(fields: [giftId], references: [id])
+
+  @@map("lucky_gift_configs")
+}
+
+model JackpotPool {
+  id            String   @id @default(cuid())
+  totalCoins    BigInt   @default(0)
+  lastWonAt     DateTime?
+  lastWinnerId  String?
+  lastWonCoins  BigInt?
+  updatedAt     DateTime @updatedAt
+
+  @@map("jackpot_pool")
 }

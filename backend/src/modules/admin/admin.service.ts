@@ -408,6 +408,32 @@ export class AdminService {
     return updated;
   }
 
+  async markWithdrawalPaid(adminId: string, withdrawalId: string, txId?: string) {
+    const withdrawal = await this.prisma.withdrawal.findUnique({ where: { id: withdrawalId } });
+    if (!withdrawal) throw new NotFoundException('Withdrawal not found');
+    if (withdrawal.status !== WithdrawalStatus.APPROVED) {
+      throw new BadRequestException('Withdrawal must be approved before marking as paid');
+    }
+
+    const updated = await this.prisma.withdrawal.update({
+      where: { id: withdrawalId },
+      data: {
+        status: WithdrawalStatus.COMPLETED,
+        processedBy: adminId,
+        processedAt: new Date(),
+        ...(txId && { txId }),
+      },
+    });
+
+    await this.createAuditLog(adminId, 'MARK_WITHDRAWAL_PAID', 'Withdrawal', withdrawalId, {
+      txId,
+      amount: Number(withdrawal.amount),
+      userId: withdrawal.userId,
+    });
+
+    return updated;
+  }
+
   // ==================== GIFTS ====================
 
   async getAllGifts() {

@@ -314,4 +314,94 @@ export class WalletService {
 
     return { message: 'Recharge successful', coins };
   }
+
+  async getRechargeProducts() {
+    const products = await this.prisma.rechargeProduct.findMany({
+      where: { isActive: true },
+      orderBy: [{ type: 'asc' }, { sortOrder: 'asc' }],
+    });
+    if (products.length > 0) return products;
+
+    // Fallback: hardcoded products when seed not yet run
+    return [
+      { productId: 'voxo_coin_1000000', title: '1,000,000 Tanga', type: 'COINS', baseAmount: 1000000, bonusAmount: 500000, priceUzs: 9900 },
+      { productId: 'voxo_coin_5000000', title: '5,000,000 Tanga', type: 'COINS', baseAmount: 5000000, bonusAmount: 1000000, priceUzs: 44900 },
+      { productId: 'voxo_coin_10000000', title: '10,000,000 Tanga', type: 'COINS', baseAmount: 10000000, bonusAmount: 1500000, priceUzs: 79900 },
+      { productId: 'voxo_diamond_100', title: '100 Olmos', type: 'DIAMONDS', baseAmount: 100, bonusAmount: 0, priceUzs: 9900 },
+      { productId: 'voxo_diamond_500', title: '500 Olmos', type: 'DIAMONDS', baseAmount: 500, bonusAmount: 0, priceUzs: 44900 },
+      { productId: 'voxo_diamond_1000', title: '1,000 Olmos', type: 'DIAMONDS', baseAmount: 1000, bonusAmount: 0, priceUzs: 79900 },
+    ];
+  }
+
+  async getFirstRechargeOffer(userId: string) {
+    const existing = await this.prisma.userFirstRecharge.findUnique({ where: { userId } });
+    if (existing) return { eligible: false };
+
+    return {
+      eligible: true,
+      offers: [
+        { productId: 'voxo_first_recharge_099', priceUzs: 990, coins: 100000, bonusCoins: 50000 },
+        { productId: 'voxo_first_recharge_499', priceUzs: 4900, coins: 500000, bonusCoins: 250000 },
+        { productId: 'voxo_first_recharge_999', priceUzs: 9900, coins: 1000000, bonusCoins: 1000000 },
+      ],
+    };
+  }
+
+  async getDailyRechargeProgress(userId: string) {
+    const date = new Date().toISOString().slice(0, 10);
+    const progress = await this.prisma.userDailyRechargeProgress.findUnique({
+      where: { userId_date: { userId, date } },
+    });
+
+    const thresholds = [1_000_000, 2_000_000, 3_000_000, 5_000_000, 10_000_000];
+    const rewards = [50_000, 50_000, 100_000, 200_000, 500_000];
+    const totalCoins = Number(progress?.totalCoins ?? 0);
+    const claimed: number[] = progress?.claimedTiers as number[] ?? [];
+
+    return {
+      date,
+      totalCoins,
+      thresholds,
+      rewards,
+      claimedTiers: claimed,
+      nextTier: thresholds.findIndex((t, i) => totalCoins >= t && !claimed.includes(i)),
+    };
+  }
+
+  async claimDailyRecharge(userId: string, tier: number) {
+    const thresholds = [1_000_000, 2_000_000, 3_000_000, 5_000_000, 10_000_000];
+    const rewards = [50_000, 50_000, 100_000, 200_000, 500_000];
+
+    if (tier < 0 || tier >= thresholds.length) {
+      throw new BadRequestException('Invalid tier');
+    }
+
+    const date = new Date().toISOString().slice(0, 10);
+    const progress = await this.prisma.userDailyRechargeProgress.findUnique({
+      where: { userId_date: { userId, date } },
+    });
+
+    const claimed: number[] = progress?.claimedTiers as number[] ?? [];
+    if (claimed.includes(tier)) throw new BadRequestException('Tier already claimed');
+    if (Number(progress?.totalCoins ?? 0) < thresholds[tier]) {
+      throw new BadRequestException('Insufficient recharge for this tier');
+    }
+
+    const reward = rewards[tier];
+    claimed.push(tier);
+
+    await this.prisma.$transaction([
+      this.prisma.userDailyRechargeProgress.upsert({
+        where: { userId_date: { userId, date } },
+        update: { claimedTiers: claimed },
+        create: { userId, date, totalCoins: 0, claimedTiers: claimed },
+      }),
+      this.prisma.wallet.update({
+        where: { userId },
+        data: { coins: { increment: reward } },
+      }),
+    ]);
+
+    return { claimedTier: tier, coinsAwarded: reward };
+  }
 }

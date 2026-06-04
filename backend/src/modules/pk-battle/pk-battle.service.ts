@@ -8,6 +8,8 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import { Redis } from 'ioredis';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
 import { BattleStatus } from '@prisma/client';
 import dayjs from 'dayjs';
 
@@ -18,6 +20,7 @@ export class PkBattleService {
   constructor(
     private prisma: PrismaService,
     @InjectRedis() private redis: Redis,
+    @InjectQueue('pk-battle') private pkBattleQueue: Queue,
   ) {}
 
   async challengeRoom(
@@ -140,11 +143,12 @@ export class PkBattleService {
       duration + 60,
     );
 
-    setTimeout(() => {
-      this.endBattle(battleId).catch((err) => {
-        this.logger.error(`Failed to end battle ${battleId}:`, err);
-      });
-    }, duration * 1000);
+    // BullMQ delayed job — survives server restarts (stored in Redis)
+    await this.pkBattleQueue.add(
+      'end-battle',
+      { battleId },
+      { delay: duration * 1000, jobId: `pk-auto-end:${battleId}`, removeOnComplete: true },
+    );
 
     return battle;
   }
