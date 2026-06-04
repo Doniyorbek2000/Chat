@@ -70,7 +70,7 @@ export class ShopService {
     if (!item || !item.isActive) throw new NotFoundException('Shop item not found');
 
     // Check level requirement
-    if (item.levelRequired > 0 || item.vipRequired > 0) {
+    if (item.levelRequired > 0 || item.vipRequired > 0 || item.nobleRequired) {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
         select: { level: true, vipLevel: true },
@@ -81,6 +81,22 @@ export class ShopService {
       }
       if (item.vipRequired > 0 && (user.vipLevel ?? 0) < item.vipRequired) {
         throw new BadRequestException(`VIP level ${item.vipRequired} required`);
+      }
+      if (item.nobleRequired) {
+        const tierOrder = ['PRINCE', 'NOBLE', 'RULER', 'PRESIDENT'];
+        const requiredIdx = tierOrder.indexOf(item.nobleRequired);
+        const sub = await this.prisma.userNobleSubscription.findUnique({
+          where: { userId },
+          select: { tier: true, isActive: true, expiresAt: true },
+        });
+        const hasNoble =
+          sub &&
+          sub.isActive &&
+          sub.expiresAt > new Date() &&
+          tierOrder.indexOf(sub.tier) >= requiredIdx;
+        if (!hasNoble) {
+          throw new BadRequestException(`Noble rank ${item.nobleRequired} required`);
+        }
       }
     }
 

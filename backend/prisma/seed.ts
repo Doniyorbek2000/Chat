@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole, GiftCategory, GiftType, VehicleLevel, RoomType, EventType, LinkType, Currency, RechargeProductType } from '@prisma/client';
+import { PrismaClient, UserRole, GiftCategory, GiftType, VehicleLevel, RoomType, EventType, LinkType, Currency, RechargeProductType, NobleTier, AssetGrade, MedalCategory, ShopCategory } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -725,6 +725,429 @@ async function seedRechargeProducts() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Stage 4 seed functions
+// ---------------------------------------------------------------------------
+
+async function seedNoblePlans() {
+  console.log('Seeding noble plans...');
+
+  const plans = [
+    {
+      tier: NobleTier.PRINCE,
+      name: 'Shahzoda',
+      monthlyPriceCoins: 50000,
+      monthlyPriceDiamonds: 0,
+      badgeUrl: 'https://cdn.voxo.app/noble/prince-badge.png',
+      frameUrl: 'https://cdn.voxo.app/noble/prince-frame.png',
+      entranceEffectUrl: 'https://cdn.voxo.app/noble/prince-entry.svga',
+      profileCardUrl: 'https://cdn.voxo.app/noble/prince-card.png',
+      coloredNameStyle: '#B8860B',
+      dailyCoins: 500,
+      expBoostPercent: 10,
+      giftDiscountPercent: 5,
+      exclusiveGiftAccess: false,
+      roomIdentity: 'prince',
+      isActive: true,
+      sortOrder: 1,
+    },
+    {
+      tier: NobleTier.NOBLE,
+      name: 'Olijanob',
+      monthlyPriceCoins: 150000,
+      monthlyPriceDiamonds: 0,
+      badgeUrl: 'https://cdn.voxo.app/noble/noble-badge.png',
+      frameUrl: 'https://cdn.voxo.app/noble/noble-frame.png',
+      entranceEffectUrl: 'https://cdn.voxo.app/noble/noble-entry.svga',
+      profileCardUrl: 'https://cdn.voxo.app/noble/noble-card.png',
+      coloredNameStyle: '#4169E1',
+      dailyCoins: 1500,
+      expBoostPercent: 20,
+      giftDiscountPercent: 10,
+      exclusiveGiftAccess: true,
+      roomIdentity: 'noble',
+      isActive: true,
+      sortOrder: 2,
+    },
+    {
+      tier: NobleTier.RULER,
+      name: 'Hukmdor',
+      monthlyPriceCoins: 500000,
+      monthlyPriceDiamonds: 0,
+      badgeUrl: 'https://cdn.voxo.app/noble/ruler-badge.png',
+      frameUrl: 'https://cdn.voxo.app/noble/ruler-frame.png',
+      entranceEffectUrl: 'https://cdn.voxo.app/noble/ruler-entry.svga',
+      profileCardUrl: 'https://cdn.voxo.app/noble/ruler-card.png',
+      coloredNameStyle: '#9400D3',
+      dailyCoins: 5000,
+      expBoostPercent: 35,
+      giftDiscountPercent: 15,
+      exclusiveGiftAccess: true,
+      roomIdentity: 'ruler',
+      isActive: true,
+      sortOrder: 3,
+    },
+    {
+      tier: NobleTier.PRESIDENT,
+      name: 'Prezident',
+      monthlyPriceCoins: 2000000,
+      monthlyPriceDiamonds: 0,
+      badgeUrl: 'https://cdn.voxo.app/noble/president-badge.png',
+      frameUrl: 'https://cdn.voxo.app/noble/president-frame.png',
+      entranceEffectUrl: 'https://cdn.voxo.app/noble/president-entry.svga',
+      profileCardUrl: 'https://cdn.voxo.app/noble/president-card.png',
+      coloredNameStyle: '#FFD700',
+      dailyCoins: 20000,
+      expBoostPercent: 50,
+      giftDiscountPercent: 20,
+      exclusiveGiftAccess: true,
+      roomIdentity: 'president',
+      isActive: true,
+      sortOrder: 4,
+    },
+  ];
+
+  for (const plan of plans) {
+    await prisma.noblePlan.upsert({
+      where: { tier: plan.tier },
+      update: { ...plan },
+      create: { ...plan },
+    });
+  }
+
+  console.log(`  Seeded ${plans.length} noble plans.`);
+}
+
+async function seedPrestigeLevelRules() {
+  console.log('Seeding prestige level rules...');
+
+  // Lv.0 to Lv.30 thresholds
+  const rules = [
+    { level: 0, requiredPoints: 0 },
+    { level: 1, requiredPoints: 100, rewardCoins: 500 },
+    { level: 2, requiredPoints: 200, rewardCoins: 1000 },
+    { level: 3, requiredPoints: 300, rewardCoins: 1500 },
+    { level: 4, requiredPoints: 500, rewardCoins: 2000 },
+    { level: 5, requiredPoints: 800, rewardCoins: 3000 },
+    { level: 6, requiredPoints: 1500, rewardCoins: 5000 },
+    { level: 7, requiredPoints: 2200, rewardCoins: 7000 },
+    { level: 8, requiredPoints: 2900, rewardCoins: 10000 },
+    { level: 9, requiredPoints: 3600, rewardCoins: 15000 },
+    { level: 10, requiredPoints: 4400, rewardCoins: 20000 },
+    { level: 11, requiredPoints: 5300, rewardCoins: 25000 },
+    { level: 12, requiredPoints: 6500, rewardCoins: 30000 },
+    { level: 13, requiredPoints: 8000, rewardCoins: 40000 },
+    { level: 14, requiredPoints: 10000, rewardCoins: 50000 },
+    { level: 15, requiredPoints: 12500, rewardCoins: 60000 },
+    { level: 16, requiredPoints: 15500, rewardCoins: 75000 },
+    { level: 17, requiredPoints: 19000, rewardCoins: 90000 },
+    { level: 18, requiredPoints: 23000, rewardCoins: 110000 },
+    { level: 19, requiredPoints: 28000, rewardCoins: 130000 },
+    { level: 20, requiredPoints: 34000, rewardCoins: 160000 },
+    { level: 21, requiredPoints: 41000, rewardCoins: 200000 },
+    { level: 22, requiredPoints: 49000, rewardCoins: 240000 },
+    { level: 23, requiredPoints: 58000, rewardCoins: 290000 },
+    { level: 24, requiredPoints: 68000, rewardCoins: 340000 },
+    { level: 25, requiredPoints: 80000, rewardCoins: 400000 },
+    { level: 26, requiredPoints: 95000, rewardCoins: 500000 },
+    { level: 27, requiredPoints: 115000, rewardCoins: 600000 },
+    { level: 28, requiredPoints: 140000, rewardCoins: 750000 },
+    { level: 29, requiredPoints: 170000, rewardCoins: 900000 },
+    { level: 30, requiredPoints: 200000, rewardCoins: 1000000 },
+  ];
+
+  let created = 0;
+  for (const rule of rules) {
+    await prisma.prestigeLevelRule.upsert({
+      where: { level: rule.level },
+      update: { ...rule },
+      create: { ...rule },
+    });
+    created++;
+  }
+
+  console.log(`  Seeded ${created} prestige level rules (Lv.0–Lv.30).`);
+}
+
+async function seedMedals() {
+  console.log('Seeding medals...');
+
+  const medals = [
+    // ===== ACHIEVEMENT - Grade C =====
+    { name: 'Birinchi Qadam', description: 'Birinchi marta tizimga kirish', imageUrl: 'https://cdn.voxo.app/medals/first-step.png', category: MedalCategory.ACHIEVEMENT, grade: AssetGrade.C, prestigeValue: 10 },
+    { name: 'Yangi A\'zo', description: 'Profilni to\'ldirish', imageUrl: 'https://cdn.voxo.app/medals/new-member.png', category: MedalCategory.ACHIEVEMENT, grade: AssetGrade.C, prestigeValue: 15 },
+    { name: 'Birinchi Sovg\'a', description: 'Birinchi sovg\'a yuborish', imageUrl: 'https://cdn.voxo.app/medals/first-gift.png', category: MedalCategory.ACHIEVEMENT, grade: AssetGrade.C, prestigeValue: 20 },
+    { name: 'Suhbatchi', description: '10 ta xona tashrif buyurish', imageUrl: 'https://cdn.voxo.app/medals/chatty.png', category: MedalCategory.ACHIEVEMENT, grade: AssetGrade.C, prestigeValue: 25 },
+    { name: 'Xush Kelibsiz', description: 'Birinchi hafta faolligi', imageUrl: 'https://cdn.voxo.app/medals/welcome.png', category: MedalCategory.ACHIEVEMENT, grade: AssetGrade.C, prestigeValue: 30 },
+
+    // ===== ACHIEVEMENT - Grade B =====
+    { name: 'Faol Ovchi', description: '100 ta sovg\'a yuborish', imageUrl: 'https://cdn.voxo.app/medals/active-hunter.png', category: MedalCategory.ACHIEVEMENT, grade: AssetGrade.B, prestigeValue: 80 },
+    { name: 'Xona Yulduz', description: '5 ta xona ochish', imageUrl: 'https://cdn.voxo.app/medals/room-star.png', category: MedalCategory.ACHIEVEMENT, grade: AssetGrade.B, prestigeValue: 100 },
+    { name: 'Avlod Yetakchi', description: 'Oilaga a\'zo bo\'lish', imageUrl: 'https://cdn.voxo.app/medals/family-leader.png', category: MedalCategory.ACHIEVEMENT, grade: AssetGrade.B, prestigeValue: 120 },
+    { name: '7 Kunlik Streak', description: '7 kun ketma-ket kirish', imageUrl: 'https://cdn.voxo.app/medals/streak-7.png', category: MedalCategory.ACHIEVEMENT, grade: AssetGrade.B, prestigeValue: 150 },
+    { name: 'VIP Do\'sti', description: 'VIP bo\'lish', imageUrl: 'https://cdn.voxo.app/medals/vip-friend.png', category: MedalCategory.ACHIEVEMENT, grade: AssetGrade.B, prestigeValue: 200 },
+
+    // ===== ACHIEVEMENT - Grade A =====
+    { name: 'Oltin Sovg\'a', description: '1000 ta sovg\'a yuborish', imageUrl: 'https://cdn.voxo.app/medals/golden-gift.png', category: MedalCategory.ACHIEVEMENT, grade: AssetGrade.A, prestigeValue: 400 },
+    { name: 'Millioner', description: '1,000,000 coin sarflash', imageUrl: 'https://cdn.voxo.app/medals/millioner.png', category: MedalCategory.ACHIEVEMENT, grade: AssetGrade.A, prestigeValue: 500 },
+    { name: 'Ustoz', description: '10 ta do\'st taklif qilish', imageUrl: 'https://cdn.voxo.app/medals/mentor.png', category: MedalCategory.ACHIEVEMENT, grade: AssetGrade.A, prestigeValue: 600 },
+    { name: 'Dubl Chempion', description: 'PK jangda 10 marta g\'alaba', imageUrl: 'https://cdn.voxo.app/medals/dual-champion.png', category: MedalCategory.ACHIEVEMENT, grade: AssetGrade.A, prestigeValue: 700 },
+    { name: '30 Kunlik Streak', description: '30 kun ketma-ket kirish', imageUrl: 'https://cdn.voxo.app/medals/streak-30.png', category: MedalCategory.ACHIEVEMENT, grade: AssetGrade.A, prestigeValue: 800 },
+
+    // ===== ACHIEVEMENT - Grade S =====
+    { name: 'Aristokrat', description: 'Noble obuna olish', imageUrl: 'https://cdn.voxo.app/medals/aristocrat.png', category: MedalCategory.ACHIEVEMENT, grade: AssetGrade.S, prestigeValue: 1200 },
+    { name: 'Xazinachi', description: '10,000,000 coin sarflash', imageUrl: 'https://cdn.voxo.app/medals/treasurer.png', category: MedalCategory.ACHIEVEMENT, grade: AssetGrade.S, prestigeValue: 1500 },
+    { name: 'Afsonaviy', description: 'Barcha gift kategoriyalarini yuborish', imageUrl: 'https://cdn.voxo.app/medals/legendary.png', category: MedalCategory.ACHIEVEMENT, grade: AssetGrade.S, prestigeValue: 2000 },
+    { name: 'Super VIP', description: 'VIP5+ darajasiga yetish', imageUrl: 'https://cdn.voxo.app/medals/super-vip.png', category: MedalCategory.ACHIEVEMENT, grade: AssetGrade.S, prestigeValue: 2500 },
+    { name: 'Imperiya Quruvchi', description: 'Oilani 50 a\'zoga yetkazish', imageUrl: 'https://cdn.voxo.app/medals/empire-builder.png', category: MedalCategory.ACHIEVEMENT, grade: AssetGrade.S, prestigeValue: 3000 },
+
+    // ===== ACHIEVEMENT - Grade SS =====
+    { name: 'Prezident', description: 'President Noble darajasiga erishish', imageUrl: 'https://cdn.voxo.app/medals/president-medal.png', category: MedalCategory.ACHIEVEMENT, grade: AssetGrade.SS, prestigeValue: 5000 },
+    { name: 'Dunyoning Eng Saxiy', description: '100,000,000 coin sovg\'a yuborish', imageUrl: 'https://cdn.voxo.app/medals/worlds-generous.png', category: MedalCategory.ACHIEVEMENT, grade: AssetGrade.SS, prestigeValue: 8000 },
+    { name: 'Afsonaviy Lider', description: 'Liderlar jadvalida 1-o\'rin', imageUrl: 'https://cdn.voxo.app/medals/legend-leader.png', category: MedalCategory.ACHIEVEMENT, grade: AssetGrade.SS, prestigeValue: 10000 },
+
+    // ===== EVENT medals =====
+    { name: 'Bahor Festivali', description: 'Bahor festivalida qatnashish', imageUrl: 'https://cdn.voxo.app/medals/spring-festival.png', category: MedalCategory.EVENT, grade: AssetGrade.B, prestigeValue: 100 },
+    { name: 'Yoz Chempioni', description: 'Yoz musobaqasida g\'alaba', imageUrl: 'https://cdn.voxo.app/medals/summer-champ.png', category: MedalCategory.EVENT, grade: AssetGrade.A, prestigeValue: 400 },
+    { name: 'Qish Qahramoni', description: 'Qish kubogi sohibi', imageUrl: 'https://cdn.voxo.app/medals/winter-hero.png', category: MedalCategory.EVENT, grade: AssetGrade.A, prestigeValue: 500 },
+    { name: 'Navro\'z Tantanasi', description: 'Navro\'z festivalida faollik', imageUrl: 'https://cdn.voxo.app/medals/navruz.png', category: MedalCategory.EVENT, grade: AssetGrade.B, prestigeValue: 150 },
+    { name: 'Mustaqillik Kuni', description: 'Mustaqillik kuni maxsus tadbiri', imageUrl: 'https://cdn.voxo.app/medals/independence.png', category: MedalCategory.EVENT, grade: AssetGrade.A, prestigeValue: 350 },
+    { name: 'Yillik Grand Prix', description: 'Yillik eng yaxshi foydalanuvchi', imageUrl: 'https://cdn.voxo.app/medals/annual-prix.png', category: MedalCategory.EVENT, grade: AssetGrade.SS, prestigeValue: 6000 },
+    { name: 'Top Gifter Oylik', description: 'Oylik sovg\'a reyting top-3', imageUrl: 'https://cdn.voxo.app/medals/top-gifter-monthly.png', category: MedalCategory.EVENT, grade: AssetGrade.S, prestigeValue: 2000 },
+    { name: 'Maxsus Mehmon', description: 'Maxsus tadbirda qatnashish', imageUrl: 'https://cdn.voxo.app/medals/special-guest.png', category: MedalCategory.EVENT, grade: AssetGrade.C, prestigeValue: 50 },
+
+    // ===== GIFT medals =====
+    { name: 'Gul Sevgi', description: '100 ta Atirgul yuborish', imageUrl: 'https://cdn.voxo.app/medals/rose-lover.png', category: MedalCategory.GIFT, grade: AssetGrade.C, prestigeValue: 30 },
+    { name: 'Brilyant Yurak', description: '50 ta Brilyant sovg\'a yuborish', imageUrl: 'https://cdn.voxo.app/medals/diamond-heart.png', category: MedalCategory.GIFT, grade: AssetGrade.B, prestigeValue: 120 },
+    { name: 'Omad Shohi', description: '100 ta Lucky sovg\'a yuborish', imageUrl: 'https://cdn.voxo.app/medals/lucky-king.png', category: MedalCategory.GIFT, grade: AssetGrade.A, prestigeValue: 450 },
+    { name: 'Ko\'chmas Mulk', description: 'Qal\'a sovg\'asini yuborish', imageUrl: 'https://cdn.voxo.app/medals/castle-owner.png', category: MedalCategory.GIFT, grade: AssetGrade.A, prestigeValue: 500 },
+    { name: 'Koinot Beruvchi', description: 'Koinot sovg\'asini yuborish', imageUrl: 'https://cdn.voxo.app/medals/universe-giver.png', category: MedalCategory.GIFT, grade: AssetGrade.S, prestigeValue: 1500 },
+    { name: 'Muhabbat Qahramoni', description: '1000 ta Relationship sovg\'a yuborish', imageUrl: 'https://cdn.voxo.app/medals/love-hero.png', category: MedalCategory.GIFT, grade: AssetGrade.S, prestigeValue: 2000 },
+    { name: 'Jackpot G\'olibi', description: 'Jackpot yutish', imageUrl: 'https://cdn.voxo.app/medals/jackpot-winner.png', category: MedalCategory.GIFT, grade: AssetGrade.SS, prestigeValue: 5000 },
+    { name: 'Aristokrat Saxiy', description: 'Aristocracy sovg\'asini yuborish', imageUrl: 'https://cdn.voxo.app/medals/aristocrat-gift.png', category: MedalCategory.GIFT, grade: AssetGrade.SS, prestigeValue: 4000 },
+    { name: 'Meva Bahosi', description: '50 ta Lucky Fruit yuborish', imageUrl: 'https://cdn.voxo.app/medals/fruit-master.png', category: MedalCategory.GIFT, grade: AssetGrade.B, prestigeValue: 180 },
+    { name: 'Juft Yurak', description: '20 ta Couple sovg\'a yuborish', imageUrl: 'https://cdn.voxo.app/medals/couple-heart.png', category: MedalCategory.GIFT, grade: AssetGrade.B, prestigeValue: 200 },
+  ];
+
+  let created = 0;
+  for (const medal of medals) {
+    const existing = await prisma.medal.findFirst({ where: { name: medal.name } });
+    if (!existing) {
+      await prisma.medal.create({ data: { ...medal, isActive: true } });
+      created++;
+    }
+  }
+
+  console.log(`  Seeded ${created} new medals (${medals.length} total defined).`);
+}
+
+async function seedShopItems() {
+  console.log('Seeding shop items...');
+
+  const items = [
+    // ===== FRAMES =====
+    { category: ShopCategory.FRAME, title: 'Bronza Ramka', imageUrl: 'https://cdn.voxo.app/frames/bronze-frame.png', grade: AssetGrade.C, priceCoins: 500, durationDays: 30, isPermanent: false, sortOrder: 1 },
+    { category: ShopCategory.FRAME, title: 'Kumush Ramka', imageUrl: 'https://cdn.voxo.app/frames/silver-frame.png', grade: AssetGrade.B, priceCoins: 1200, durationDays: 30, isPermanent: false, sortOrder: 2 },
+    { category: ShopCategory.FRAME, title: 'Oltin Ramka', imageUrl: 'https://cdn.voxo.app/frames/gold-frame.png', grade: AssetGrade.A, priceCoins: 3000, durationDays: 30, isPermanent: false, sortOrder: 3 },
+    { category: ShopCategory.FRAME, title: 'Platina Ramka', imageUrl: 'https://cdn.voxo.app/frames/platinum-frame.png', grade: AssetGrade.S, priceCoins: 8000, isPermanent: true, sortOrder: 4 },
+    { category: ShopCategory.FRAME, title: 'Brilyant Ramka', imageUrl: 'https://cdn.voxo.app/frames/diamond-frame.png', grade: AssetGrade.S, priceCoins: 15000, isPermanent: true, sortOrder: 5 },
+    { category: ShopCategory.FRAME, title: 'Afsonaviy Ramka', imageUrl: 'https://cdn.voxo.app/frames/legendary-frame.png', grade: AssetGrade.SS, priceCoins: 50000, isPermanent: true, sortOrder: 6 },
+    { category: ShopCategory.FRAME, title: 'Shahzoda Ramkasi', imageUrl: 'https://cdn.voxo.app/frames/prince-frame.png', grade: AssetGrade.SS, priceCoins: 100000, isPermanent: true, nobleRequired: 'PRINCE', sortOrder: 7 },
+    { category: ShopCategory.FRAME, title: 'Prezident Ramkasi', imageUrl: 'https://cdn.voxo.app/frames/president-frame.png', grade: AssetGrade.SS, priceCoins: 500000, isPermanent: true, nobleRequired: 'PRESIDENT', sortOrder: 8 },
+    { category: ShopCategory.FRAME, title: 'Bahor Ramkasi', imageUrl: 'https://cdn.voxo.app/frames/spring-frame.png', grade: AssetGrade.A, priceCoins: 2500, durationDays: 7, isPermanent: false, sortOrder: 9 },
+    { category: ShopCategory.FRAME, title: 'Atirgul Ramkasi', imageUrl: 'https://cdn.voxo.app/frames/rose-frame.png', grade: AssetGrade.B, priceCoins: 1500, durationDays: 15, isPermanent: false, sortOrder: 10 },
+    { category: ShopCategory.FRAME, title: 'Neon Ramka', imageUrl: 'https://cdn.voxo.app/frames/neon-frame.png', grade: AssetGrade.A, priceCoins: 4000, durationDays: 30, isPermanent: false, sortOrder: 11 },
+    { category: ShopCategory.FRAME, title: 'Galaktika Ramkasi', imageUrl: 'https://cdn.voxo.app/frames/galaxy-frame.png', grade: AssetGrade.S, priceCoins: 20000, isPermanent: true, vipRequired: 3, sortOrder: 12 },
+    { category: ShopCategory.FRAME, title: 'Rainbow Ramka', imageUrl: 'https://cdn.voxo.app/frames/rainbow-frame.png', grade: AssetGrade.A, priceCoins: 3500, durationDays: 30, isPermanent: false, sortOrder: 13 },
+    { category: ShopCategory.FRAME, title: 'Dragon Ramkasi', imageUrl: 'https://cdn.voxo.app/frames/dragon-frame.png', grade: AssetGrade.S, priceCoins: 25000, isPermanent: true, vipRequired: 4, sortOrder: 14 },
+    { category: ShopCategory.FRAME, title: 'Qirol Ramkasi', imageUrl: 'https://cdn.voxo.app/frames/king-frame.png', grade: AssetGrade.SS, priceCoins: 80000, isPermanent: true, sortOrder: 15 },
+    { category: ShopCategory.FRAME, title: 'Oy Ramkasi', imageUrl: 'https://cdn.voxo.app/frames/moon-frame.png', grade: AssetGrade.B, priceCoins: 2000, durationDays: 30, isPermanent: false, sortOrder: 16 },
+    { category: ShopCategory.FRAME, title: 'Ninja Ramkasi', imageUrl: 'https://cdn.voxo.app/frames/ninja-frame.png', grade: AssetGrade.A, priceCoins: 5000, durationDays: 30, isPermanent: false, sortOrder: 17 },
+    { category: ShopCategory.FRAME, title: 'Kitty Ramkasi', imageUrl: 'https://cdn.voxo.app/frames/kitty-frame.png', grade: AssetGrade.C, priceCoins: 800, durationDays: 30, isPermanent: false, sortOrder: 18 },
+    { category: ShopCategory.FRAME, title: 'Angel Ramkasi', imageUrl: 'https://cdn.voxo.app/frames/angel-frame.png', grade: AssetGrade.S, priceCoins: 18000, isPermanent: true, sortOrder: 19 },
+    { category: ShopCategory.FRAME, title: 'Pixel Ramka', imageUrl: 'https://cdn.voxo.app/frames/pixel-frame.png', grade: AssetGrade.C, priceCoins: 300, durationDays: 7, isPermanent: false, sortOrder: 20 },
+
+    // ===== ENTRANCE EFFECTS =====
+    { category: ShopCategory.ENTRANCE_EFFECT, title: 'Bronza Kirish', animationUrl: 'https://cdn.voxo.app/effects/bronze-entry.svga', grade: AssetGrade.C, priceCoins: 600, durationDays: 30, isPermanent: false, sortOrder: 1 },
+    { category: ShopCategory.ENTRANCE_EFFECT, title: 'Kumush Kirish', animationUrl: 'https://cdn.voxo.app/effects/silver-entry.svga', grade: AssetGrade.B, priceCoins: 1500, durationDays: 30, isPermanent: false, sortOrder: 2 },
+    { category: ShopCategory.ENTRANCE_EFFECT, title: 'Oltin Kirish', animationUrl: 'https://cdn.voxo.app/effects/gold-entry.svga', grade: AssetGrade.A, priceCoins: 4000, durationDays: 30, isPermanent: false, sortOrder: 3 },
+    { category: ShopCategory.ENTRANCE_EFFECT, title: 'Brilyant Kirish', animationUrl: 'https://cdn.voxo.app/effects/diamond-entry.svga', grade: AssetGrade.S, priceCoins: 12000, isPermanent: true, sortOrder: 4 },
+    { category: ShopCategory.ENTRANCE_EFFECT, title: 'Afsonaviy Kirish', animationUrl: 'https://cdn.voxo.app/effects/legendary-entry.svga', grade: AssetGrade.SS, priceCoins: 60000, isPermanent: true, sortOrder: 5 },
+    { category: ShopCategory.ENTRANCE_EFFECT, title: 'Gul Yomg\'iri', animationUrl: 'https://cdn.voxo.app/effects/flower-rain.svga', grade: AssetGrade.A, priceCoins: 3500, durationDays: 30, isPermanent: false, sortOrder: 6 },
+    { category: ShopCategory.ENTRANCE_EFFECT, title: 'Sharob Sharob', animationUrl: 'https://cdn.voxo.app/effects/champagne.svga', grade: AssetGrade.B, priceCoins: 2000, durationDays: 30, isPermanent: false, sortOrder: 7 },
+    { category: ShopCategory.ENTRANCE_EFFECT, title: 'Dragon Kirish', animationUrl: 'https://cdn.voxo.app/effects/dragon-entry.svga', grade: AssetGrade.SS, priceCoins: 80000, isPermanent: true, vipRequired: 5, sortOrder: 8 },
+    { category: ShopCategory.ENTRANCE_EFFECT, title: 'Confetti', animationUrl: 'https://cdn.voxo.app/effects/confetti.svga', grade: AssetGrade.C, priceCoins: 400, durationDays: 15, isPermanent: false, sortOrder: 9 },
+    { category: ShopCategory.ENTRANCE_EFFECT, title: 'Lightning', animationUrl: 'https://cdn.voxo.app/effects/lightning.svga', grade: AssetGrade.A, priceCoins: 5000, durationDays: 30, isPermanent: false, sortOrder: 10 },
+    { category: ShopCategory.ENTRANCE_EFFECT, title: 'Galaxy Entry', animationUrl: 'https://cdn.voxo.app/effects/galaxy-entry.svga', grade: AssetGrade.S, priceCoins: 20000, isPermanent: true, sortOrder: 11 },
+    { category: ShopCategory.ENTRANCE_EFFECT, title: 'Snowflake', animationUrl: 'https://cdn.voxo.app/effects/snowflake.svga', grade: AssetGrade.B, priceCoins: 1800, durationDays: 30, isPermanent: false, sortOrder: 12 },
+    { category: ShopCategory.ENTRANCE_EFFECT, title: 'Prezident Kirishi', animationUrl: 'https://cdn.voxo.app/effects/president-entry.svga', grade: AssetGrade.SS, priceCoins: 200000, isPermanent: true, nobleRequired: 'PRESIDENT', sortOrder: 13 },
+    { category: ShopCategory.ENTRANCE_EFFECT, title: 'Rainbow Arc', animationUrl: 'https://cdn.voxo.app/effects/rainbow-arc.svga', grade: AssetGrade.A, priceCoins: 4500, durationDays: 30, isPermanent: false, sortOrder: 14 },
+    { category: ShopCategory.ENTRANCE_EFFECT, title: 'Firework Burst', animationUrl: 'https://cdn.voxo.app/effects/firework-burst.svga', grade: AssetGrade.S, priceCoins: 15000, isPermanent: true, sortOrder: 15 },
+
+    // ===== CHAT BUBBLES =====
+    { category: ShopCategory.CHAT_BUBBLE, title: 'Ko\'k Pufakcha', imageUrl: 'https://cdn.voxo.app/chat/bubble-blue.png', grade: AssetGrade.C, priceCoins: 300, durationDays: 30, isPermanent: false, sortOrder: 1 },
+    { category: ShopCategory.CHAT_BUBBLE, title: 'Pushti Pufakcha', imageUrl: 'https://cdn.voxo.app/chat/bubble-pink.png', grade: AssetGrade.C, priceCoins: 350, durationDays: 30, isPermanent: false, sortOrder: 2 },
+    { category: ShopCategory.CHAT_BUBBLE, title: 'Oltin Pufakcha', imageUrl: 'https://cdn.voxo.app/chat/bubble-gold.png', grade: AssetGrade.B, priceCoins: 800, durationDays: 30, isPermanent: false, sortOrder: 3 },
+    { category: ShopCategory.CHAT_BUBBLE, title: 'Neon Pufakcha', imageUrl: 'https://cdn.voxo.app/chat/bubble-neon.png', grade: AssetGrade.A, priceCoins: 2000, durationDays: 30, isPermanent: false, sortOrder: 4 },
+    { category: ShopCategory.CHAT_BUBBLE, title: 'Qirol Pufakcha', imageUrl: 'https://cdn.voxo.app/chat/bubble-royal.png', grade: AssetGrade.S, priceCoins: 8000, isPermanent: true, sortOrder: 5 },
+    { category: ShopCategory.CHAT_BUBBLE, title: 'Kristal Pufakcha', imageUrl: 'https://cdn.voxo.app/chat/bubble-crystal.png', grade: AssetGrade.SS, priceCoins: 30000, isPermanent: true, sortOrder: 6 },
+    { category: ShopCategory.CHAT_BUBBLE, title: 'Bulut Pufakcha', imageUrl: 'https://cdn.voxo.app/chat/bubble-cloud.png', grade: AssetGrade.B, priceCoins: 1000, durationDays: 30, isPermanent: false, sortOrder: 7 },
+    { category: ShopCategory.CHAT_BUBBLE, title: 'Rainbow Pufakcha', imageUrl: 'https://cdn.voxo.app/chat/bubble-rainbow.png', grade: AssetGrade.A, priceCoins: 2500, durationDays: 30, isPermanent: false, sortOrder: 8 },
+    { category: ShopCategory.CHAT_BUBBLE, title: 'Kech Osmon', imageUrl: 'https://cdn.voxo.app/chat/bubble-night.png', grade: AssetGrade.A, priceCoins: 3000, durationDays: 30, isPermanent: false, sortOrder: 9 },
+    { category: ShopCategory.CHAT_BUBBLE, title: 'Dragon Pufakcha', imageUrl: 'https://cdn.voxo.app/chat/bubble-dragon.png', grade: AssetGrade.SS, priceCoins: 50000, isPermanent: true, sortOrder: 10 },
+    { category: ShopCategory.CHAT_BUBBLE, title: 'Qish Pufakcha', imageUrl: 'https://cdn.voxo.app/chat/bubble-winter.png', grade: AssetGrade.B, priceCoins: 900, durationDays: 15, isPermanent: false, sortOrder: 11 },
+    { category: ShopCategory.CHAT_BUBBLE, title: 'Bahor Pufakcha', imageUrl: 'https://cdn.voxo.app/chat/bubble-spring.png', grade: AssetGrade.C, priceCoins: 500, durationDays: 7, isPermanent: false, sortOrder: 12 },
+    { category: ShopCategory.CHAT_BUBBLE, title: 'Aniqa', imageUrl: 'https://cdn.voxo.app/chat/bubble-clean.png', grade: AssetGrade.C, priceCoins: 200, durationDays: 30, isPermanent: false, sortOrder: 13 },
+    { category: ShopCategory.CHAT_BUBBLE, title: 'Binafsha Pufakcha', imageUrl: 'https://cdn.voxo.app/chat/bubble-purple.png', grade: AssetGrade.B, priceCoins: 1200, durationDays: 30, isPermanent: false, sortOrder: 14 },
+    { category: ShopCategory.CHAT_BUBBLE, title: 'Galaktika Pufakcha', imageUrl: 'https://cdn.voxo.app/chat/bubble-galaxy.png', grade: AssetGrade.S, priceCoins: 10000, isPermanent: true, sortOrder: 15 },
+
+    // ===== MIC DECORATIONS =====
+    { category: ShopCategory.MIC_DECORATION, title: 'Bronza Mikrofon', imageUrl: 'https://cdn.voxo.app/mic/bronze-mic.png', grade: AssetGrade.C, priceCoins: 400, durationDays: 30, isPermanent: false, sortOrder: 1 },
+    { category: ShopCategory.MIC_DECORATION, title: 'Kumush Mikrofon', imageUrl: 'https://cdn.voxo.app/mic/silver-mic.png', grade: AssetGrade.B, priceCoins: 1000, durationDays: 30, isPermanent: false, sortOrder: 2 },
+    { category: ShopCategory.MIC_DECORATION, title: 'Oltin Mikrofon', imageUrl: 'https://cdn.voxo.app/mic/gold-mic.png', grade: AssetGrade.A, priceCoins: 2800, durationDays: 30, isPermanent: false, sortOrder: 3 },
+    { category: ShopCategory.MIC_DECORATION, title: 'Kristal Mikrofon', imageUrl: 'https://cdn.voxo.app/mic/crystal-mic.png', grade: AssetGrade.S, priceCoins: 9000, isPermanent: true, sortOrder: 4 },
+    { category: ShopCategory.MIC_DECORATION, title: 'Afsonaviy Mikrofon', imageUrl: 'https://cdn.voxo.app/mic/legendary-mic.png', grade: AssetGrade.SS, priceCoins: 40000, isPermanent: true, sortOrder: 5 },
+    { category: ShopCategory.MIC_DECORATION, title: 'Neon Mikrofon', imageUrl: 'https://cdn.voxo.app/mic/neon-mic.png', grade: AssetGrade.A, priceCoins: 3500, durationDays: 30, isPermanent: false, sortOrder: 6 },
+    { category: ShopCategory.MIC_DECORATION, title: 'Dragon Mikrofon', imageUrl: 'https://cdn.voxo.app/mic/dragon-mic.png', grade: AssetGrade.SS, priceCoins: 70000, isPermanent: true, vipRequired: 4, sortOrder: 7 },
+    { category: ShopCategory.MIC_DECORATION, title: 'Rainbow Mikrofon', imageUrl: 'https://cdn.voxo.app/mic/rainbow-mic.png', grade: AssetGrade.A, priceCoins: 4000, durationDays: 30, isPermanent: false, sortOrder: 8 },
+    { category: ShopCategory.MIC_DECORATION, title: 'Gul Mikrofon', imageUrl: 'https://cdn.voxo.app/mic/flower-mic.png', grade: AssetGrade.B, priceCoins: 1500, durationDays: 30, isPermanent: false, sortOrder: 9 },
+    { category: ShopCategory.MIC_DECORATION, title: 'Koinot Mikrofon', imageUrl: 'https://cdn.voxo.app/mic/galaxy-mic.png', grade: AssetGrade.S, priceCoins: 15000, isPermanent: true, sortOrder: 10 },
+    { category: ShopCategory.MIC_DECORATION, title: 'Sevgi Mikrofoni', imageUrl: 'https://cdn.voxo.app/mic/love-mic.png', grade: AssetGrade.B, priceCoins: 1200, durationDays: 30, isPermanent: false, sortOrder: 11 },
+    { category: ShopCategory.MIC_DECORATION, title: 'Qirol Mikrofon', imageUrl: 'https://cdn.voxo.app/mic/king-mic.png', grade: AssetGrade.S, priceCoins: 12000, isPermanent: true, sortOrder: 12 },
+    { category: ShopCategory.MIC_DECORATION, title: 'Asal Mikrofon', imageUrl: 'https://cdn.voxo.app/mic/honey-mic.png', grade: AssetGrade.C, priceCoins: 600, durationDays: 15, isPermanent: false, sortOrder: 13 },
+    { category: ShopCategory.MIC_DECORATION, title: 'Muzshunoslik', imageUrl: 'https://cdn.voxo.app/mic/music-mic.png', grade: AssetGrade.A, priceCoins: 3000, durationDays: 30, isPermanent: false, sortOrder: 14 },
+    { category: ShopCategory.MIC_DECORATION, title: 'Prezident Mikrofon', imageUrl: 'https://cdn.voxo.app/mic/president-mic.png', grade: AssetGrade.SS, priceCoins: 150000, isPermanent: true, nobleRequired: 'PRESIDENT', sortOrder: 15 },
+
+    // ===== ROOM THEMES =====
+    { category: ShopCategory.ROOM_THEME, title: 'Kech Ko\'k', imageUrl: 'https://cdn.voxo.app/themes/night-blue.jpg', grade: AssetGrade.C, priceCoins: 500, durationDays: 30, isPermanent: false, sortOrder: 1 },
+    { category: ShopCategory.ROOM_THEME, title: 'Bahor Bog\'i', imageUrl: 'https://cdn.voxo.app/themes/spring-garden.jpg', grade: AssetGrade.B, priceCoins: 1200, durationDays: 30, isPermanent: false, sortOrder: 2 },
+    { category: ShopCategory.ROOM_THEME, title: 'Galaktika', imageUrl: 'https://cdn.voxo.app/themes/galaxy.jpg', grade: AssetGrade.A, priceCoins: 3000, durationDays: 30, isPermanent: false, sortOrder: 3 },
+    { category: ShopCategory.ROOM_THEME, title: 'Qirol Saroyi', imageUrl: 'https://cdn.voxo.app/themes/royal-palace.jpg', grade: AssetGrade.S, priceCoins: 10000, isPermanent: true, sortOrder: 4 },
+    { category: ShopCategory.ROOM_THEME, title: 'Olmos Qal\'asi', imageUrl: 'https://cdn.voxo.app/themes/diamond-castle.jpg', grade: AssetGrade.SS, priceCoins: 50000, isPermanent: true, sortOrder: 5 },
+    { category: ShopCategory.ROOM_THEME, title: 'Dengiz Tubida', imageUrl: 'https://cdn.voxo.app/themes/underwater.jpg', grade: AssetGrade.A, priceCoins: 2500, durationDays: 30, isPermanent: false, sortOrder: 6 },
+    { category: ShopCategory.ROOM_THEME, title: 'Neon Shahar', imageUrl: 'https://cdn.voxo.app/themes/neon-city.jpg', grade: AssetGrade.A, priceCoins: 3500, durationDays: 30, isPermanent: false, sortOrder: 7 },
+    { category: ShopCategory.ROOM_THEME, title: 'Yoqimli Qish', imageUrl: 'https://cdn.voxo.app/themes/cozy-winter.jpg', grade: AssetGrade.B, priceCoins: 1500, durationDays: 30, isPermanent: false, sortOrder: 8 },
+    { category: ShopCategory.ROOM_THEME, title: 'Yashil O\'rmon', imageUrl: 'https://cdn.voxo.app/themes/forest.jpg', grade: AssetGrade.C, priceCoins: 700, durationDays: 30, isPermanent: false, sortOrder: 9 },
+    { category: ShopCategory.ROOM_THEME, title: 'Quyosh Botishi', imageUrl: 'https://cdn.voxo.app/themes/sunset.jpg', grade: AssetGrade.B, priceCoins: 1800, durationDays: 30, isPermanent: false, sortOrder: 10 },
+    { category: ShopCategory.ROOM_THEME, title: 'Dragon Eri', imageUrl: 'https://cdn.voxo.app/themes/dragon-lair.jpg', grade: AssetGrade.SS, priceCoins: 80000, isPermanent: true, vipRequired: 5, sortOrder: 11 },
+    { category: ShopCategory.ROOM_THEME, title: 'Futuristik', imageUrl: 'https://cdn.voxo.app/themes/futuristic.jpg', grade: AssetGrade.S, priceCoins: 15000, isPermanent: true, sortOrder: 12 },
+    { category: ShopCategory.ROOM_THEME, title: 'Japoniya Bog\'i', imageUrl: 'https://cdn.voxo.app/themes/japan-garden.jpg', grade: AssetGrade.A, priceCoins: 4000, durationDays: 30, isPermanent: false, sortOrder: 13 },
+    { category: ShopCategory.ROOM_THEME, title: 'Romantik Gul', imageUrl: 'https://cdn.voxo.app/themes/romantic-rose.jpg', grade: AssetGrade.B, priceCoins: 2000, durationDays: 30, isPermanent: false, sortOrder: 14 },
+    { category: ShopCategory.ROOM_THEME, title: 'Koinot Maydoni', imageUrl: 'https://cdn.voxo.app/themes/cosmic-arena.jpg', grade: AssetGrade.SS, priceCoins: 120000, isPermanent: true, sortOrder: 15 },
+
+    // ===== PROFILE BACKGROUNDS =====
+    { category: ShopCategory.PROFILE_BACKGROUND, title: 'Oddiy Fon', imageUrl: 'https://cdn.voxo.app/bg/plain-bg.jpg', grade: AssetGrade.C, priceCoins: 200, isPermanent: true, sortOrder: 1 },
+    { category: ShopCategory.PROFILE_BACKGROUND, title: 'Ko\'k Gradient', imageUrl: 'https://cdn.voxo.app/bg/blue-gradient.jpg', grade: AssetGrade.C, priceCoins: 300, durationDays: 30, isPermanent: false, sortOrder: 2 },
+    { category: ShopCategory.PROFILE_BACKGROUND, title: 'Rang-barang Fon', imageUrl: 'https://cdn.voxo.app/bg/colorful.jpg', grade: AssetGrade.B, priceCoins: 800, durationDays: 30, isPermanent: false, sortOrder: 3 },
+    { category: ShopCategory.PROFILE_BACKGROUND, title: 'Galaktika Foni', imageUrl: 'https://cdn.voxo.app/bg/galaxy-bg.jpg', grade: AssetGrade.A, priceCoins: 2000, durationDays: 30, isPermanent: false, sortOrder: 4 },
+    { category: ShopCategory.PROFILE_BACKGROUND, title: 'Oltin Fon', imageUrl: 'https://cdn.voxo.app/bg/golden-bg.jpg', grade: AssetGrade.S, priceCoins: 7000, isPermanent: true, sortOrder: 5 },
+    { category: ShopCategory.PROFILE_BACKGROUND, title: 'Neon Fon', imageUrl: 'https://cdn.voxo.app/bg/neon-bg.jpg', grade: AssetGrade.A, priceCoins: 3000, durationDays: 30, isPermanent: false, sortOrder: 6 },
+    { category: ShopCategory.PROFILE_BACKGROUND, title: 'Qirol Foni', imageUrl: 'https://cdn.voxo.app/bg/royal-bg.jpg', grade: AssetGrade.SS, priceCoins: 40000, isPermanent: true, sortOrder: 7 },
+    { category: ShopCategory.PROFILE_BACKGROUND, title: 'Bahor Foni', imageUrl: 'https://cdn.voxo.app/bg/spring-bg.jpg', grade: AssetGrade.B, priceCoins: 1000, durationDays: 30, isPermanent: false, sortOrder: 8 },
+    { category: ShopCategory.PROFILE_BACKGROUND, title: 'Romantik', imageUrl: 'https://cdn.voxo.app/bg/romantic-bg.jpg', grade: AssetGrade.B, priceCoins: 1200, durationDays: 30, isPermanent: false, sortOrder: 9 },
+    { category: ShopCategory.PROFILE_BACKGROUND, title: 'Futuristik Fon', imageUrl: 'https://cdn.voxo.app/bg/futuristic-bg.jpg', grade: AssetGrade.S, priceCoins: 10000, isPermanent: true, sortOrder: 10 },
+
+    // ===== NAMEPLATES =====
+    { category: ShopCategory.NAMEPLATE, title: 'Oddiy Ism', imageUrl: 'https://cdn.voxo.app/nameplate/plain.png', grade: AssetGrade.C, priceCoins: 100, durationDays: 30, isPermanent: false, sortOrder: 1 },
+    { category: ShopCategory.NAMEPLATE, title: 'Ko\'k Ism', imageUrl: 'https://cdn.voxo.app/nameplate/blue.png', grade: AssetGrade.C, priceCoins: 200, durationDays: 30, isPermanent: false, sortOrder: 2 },
+    { category: ShopCategory.NAMEPLATE, title: 'Oltin Ism', imageUrl: 'https://cdn.voxo.app/nameplate/gold.png', grade: AssetGrade.B, priceCoins: 500, durationDays: 30, isPermanent: false, sortOrder: 3 },
+    { category: ShopCategory.NAMEPLATE, title: 'Neon Ism', imageUrl: 'https://cdn.voxo.app/nameplate/neon.png', grade: AssetGrade.A, priceCoins: 1500, durationDays: 30, isPermanent: false, sortOrder: 4 },
+    { category: ShopCategory.NAMEPLATE, title: 'Qirol Ismi', imageUrl: 'https://cdn.voxo.app/nameplate/royal.png', grade: AssetGrade.S, priceCoins: 5000, isPermanent: true, sortOrder: 5 },
+    { category: ShopCategory.NAMEPLATE, title: 'Kristal Ism', imageUrl: 'https://cdn.voxo.app/nameplate/crystal.png', grade: AssetGrade.SS, priceCoins: 25000, isPermanent: true, sortOrder: 6 },
+    { category: ShopCategory.NAMEPLATE, title: 'Rainbow Ism', imageUrl: 'https://cdn.voxo.app/nameplate/rainbow.png', grade: AssetGrade.A, priceCoins: 2000, durationDays: 30, isPermanent: false, sortOrder: 7 },
+    { category: ShopCategory.NAMEPLATE, title: 'Dragon Ismi', imageUrl: 'https://cdn.voxo.app/nameplate/dragon.png', grade: AssetGrade.SS, priceCoins: 50000, isPermanent: true, sortOrder: 8 },
+    { category: ShopCategory.NAMEPLATE, title: 'Galaktika Ismi', imageUrl: 'https://cdn.voxo.app/nameplate/galaxy.png', grade: AssetGrade.S, priceCoins: 8000, isPermanent: true, sortOrder: 9 },
+    { category: ShopCategory.NAMEPLATE, title: 'Bahor Ismi', imageUrl: 'https://cdn.voxo.app/nameplate/spring.png', grade: AssetGrade.C, priceCoins: 350, durationDays: 7, isPermanent: false, sortOrder: 10 },
+  ];
+
+  let created = 0;
+  for (const item of items) {
+    const existing = await prisma.shopItem.findFirst({ where: { title: item.title, category: item.category } });
+    if (!existing) {
+      await prisma.shopItem.create({
+        data: {
+          ...item,
+          imageUrl: item.imageUrl ?? '',
+          priceDiamonds: 0,
+          vipRequired: item.vipRequired ?? 0,
+          levelRequired: 0,
+          isActive: true,
+        },
+      });
+      created++;
+    }
+  }
+
+  console.log(`  Seeded ${created} shop items (${items.length} total defined).`);
+}
+
+async function seedRoomThemes() {
+  console.log('Seeding room themes...');
+  // Room themes are already in shop items as ROOM_THEME category
+  // Also create dedicated RoomTheme models for the room-themes module
+
+  const themes = [
+    { name: 'Kech Ko\'k', imageUrl: 'https://cdn.voxo.app/themes/night-blue.jpg', grade: AssetGrade.C, priceCoins: 500, durationDays: 30, isPermanent: false, sortOrder: 1 },
+    { name: 'Bahor Bog\'i', imageUrl: 'https://cdn.voxo.app/themes/spring-garden.jpg', grade: AssetGrade.B, priceCoins: 1200, durationDays: 30, isPermanent: false, sortOrder: 2 },
+    { name: 'Galaktika', imageUrl: 'https://cdn.voxo.app/themes/galaxy.jpg', grade: AssetGrade.A, priceCoins: 3000, durationDays: 30, isPermanent: false, sortOrder: 3 },
+    { name: 'Qirol Saroyi', imageUrl: 'https://cdn.voxo.app/themes/royal-palace.jpg', grade: AssetGrade.S, priceCoins: 10000, isPermanent: true, sortOrder: 4 },
+    { name: 'Olmos Qal\'asi', imageUrl: 'https://cdn.voxo.app/themes/diamond-castle.jpg', grade: AssetGrade.SS, priceCoins: 50000, isPermanent: true, sortOrder: 5 },
+    { name: 'Dengiz Tubida', imageUrl: 'https://cdn.voxo.app/themes/underwater.jpg', grade: AssetGrade.A, priceCoins: 2500, durationDays: 30, isPermanent: false, sortOrder: 6 },
+    { name: 'Neon Shahar', imageUrl: 'https://cdn.voxo.app/themes/neon-city.jpg', grade: AssetGrade.A, priceCoins: 3500, durationDays: 30, isPermanent: false, sortOrder: 7 },
+    { name: 'Yoqimli Qish', imageUrl: 'https://cdn.voxo.app/themes/cozy-winter.jpg', grade: AssetGrade.B, priceCoins: 1500, durationDays: 30, isPermanent: false, sortOrder: 8 },
+    { name: 'Yashil O\'rmon', imageUrl: 'https://cdn.voxo.app/themes/forest.jpg', grade: AssetGrade.C, priceCoins: 700, durationDays: 30, isPermanent: false, sortOrder: 9 },
+    { name: 'Quyosh Botishi', imageUrl: 'https://cdn.voxo.app/themes/sunset.jpg', grade: AssetGrade.B, priceCoins: 1800, durationDays: 30, isPermanent: false, sortOrder: 10 },
+    { name: 'Dragon Eri', imageUrl: 'https://cdn.voxo.app/themes/dragon-lair.jpg', grade: AssetGrade.SS, priceCoins: 80000, isPermanent: true, sortOrder: 11 },
+    { name: 'Futuristik', imageUrl: 'https://cdn.voxo.app/themes/futuristic.jpg', grade: AssetGrade.S, priceCoins: 15000, isPermanent: true, sortOrder: 12 },
+    { name: 'Japoniya Bog\'i', imageUrl: 'https://cdn.voxo.app/themes/japan-garden.jpg', grade: AssetGrade.A, priceCoins: 4000, durationDays: 30, isPermanent: false, sortOrder: 13 },
+    { name: 'Romantik Gul', imageUrl: 'https://cdn.voxo.app/themes/romantic-rose.jpg', grade: AssetGrade.B, priceCoins: 2000, durationDays: 30, isPermanent: false, sortOrder: 14 },
+    { name: 'Koinot Maydoni', imageUrl: 'https://cdn.voxo.app/themes/cosmic-arena.jpg', grade: AssetGrade.SS, priceCoins: 120000, isPermanent: true, sortOrder: 15 },
+  ];
+
+  let created = 0;
+  for (const theme of themes) {
+    const existing = await prisma.roomTheme.findFirst({ where: { name: theme.name } });
+    if (!existing) {
+      await prisma.roomTheme.create({
+        data: { ...theme, priceDiamonds: 0, isActive: true },
+      });
+      created++;
+    }
+  }
+
+  console.log(`  Seeded ${created} room themes.`);
+}
+
+async function seedNameplates() {
+  console.log('Seeding nameplates...');
+
+  const nameplates = [
+    { name: 'Oddiy Ism', imageUrl: 'https://cdn.voxo.app/nameplate/plain.png', grade: AssetGrade.C, priceCoins: 100, isPermanent: true, sortOrder: 1 },
+    { name: 'Ko\'k Ism', imageUrl: 'https://cdn.voxo.app/nameplate/blue.png', grade: AssetGrade.C, priceCoins: 200, durationDays: 30, isPermanent: false, sortOrder: 2 },
+    { name: 'Oltin Ism', imageUrl: 'https://cdn.voxo.app/nameplate/gold.png', grade: AssetGrade.B, priceCoins: 500, durationDays: 30, isPermanent: false, sortOrder: 3 },
+    { name: 'Neon Ism', imageUrl: 'https://cdn.voxo.app/nameplate/neon.png', grade: AssetGrade.A, priceCoins: 1500, durationDays: 30, isPermanent: false, sortOrder: 4 },
+    { name: 'Qirol Ismi', imageUrl: 'https://cdn.voxo.app/nameplate/royal.png', grade: AssetGrade.S, priceCoins: 5000, isPermanent: true, sortOrder: 5 },
+    { name: 'Kristal Ism', imageUrl: 'https://cdn.voxo.app/nameplate/crystal.png', grade: AssetGrade.SS, priceCoins: 25000, isPermanent: true, sortOrder: 6 },
+    { name: 'Rainbow Ism', imageUrl: 'https://cdn.voxo.app/nameplate/rainbow.png', grade: AssetGrade.A, priceCoins: 2000, durationDays: 30, isPermanent: false, sortOrder: 7 },
+    { name: 'Dragon Ismi', imageUrl: 'https://cdn.voxo.app/nameplate/dragon.png', grade: AssetGrade.SS, priceCoins: 50000, isPermanent: true, sortOrder: 8 },
+    { name: 'Galaktika Ismi', imageUrl: 'https://cdn.voxo.app/nameplate/galaxy.png', grade: AssetGrade.S, priceCoins: 8000, isPermanent: true, sortOrder: 9 },
+    { name: 'Bahor Ismi', imageUrl: 'https://cdn.voxo.app/nameplate/spring.png', grade: AssetGrade.C, priceCoins: 350, durationDays: 7, isPermanent: false, sortOrder: 10 },
+  ];
+
+  let created = 0;
+  for (const np of nameplates) {
+    const existing = await prisma.nameplate.findFirst({ where: { name: np.name } });
+    if (!existing) {
+      await prisma.nameplate.create({
+        data: { ...np, priceDiamonds: 0, levelRequired: 0, isActive: true },
+      });
+      created++;
+    }
+  }
+
+  console.log(`  Seeded ${created} nameplates.`);
+}
+
 async function main() {
   console.log('Starting VOXO database seed...\n');
 
@@ -765,6 +1188,14 @@ async function main() {
 
   // Seed rooms (admin as host)
   await seedRooms(admin.id);
+
+  // Stage 4 seeds
+  await seedNoblePlans();
+  await seedPrestigeLevelRules();
+  await seedMedals();
+  await seedShopItems();
+  await seedRoomThemes();
+  await seedNameplates();
 
   console.log('\nVOXO seed completed successfully!');
   console.log('-----------------------------------');

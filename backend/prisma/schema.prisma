@@ -21,6 +21,44 @@ enum TransactionType {
   VIP_PURCHASE
   VEHICLE_PURCHASE
   FRAME_PURCHASE
+  NOBLE_PURCHASE
+  SHOP_PURCHASE
+  MEDAL_UNLOCK
+  NAMEPLATE_PURCHASE
+}
+
+enum NobleTier {
+  PRINCE
+  NOBLE
+  RULER
+  PRESIDENT
+}
+
+enum AssetGrade {
+  SS
+  S
+  A
+  B
+  C
+}
+
+enum MedalCategory {
+  ACHIEVEMENT
+  EVENT
+  GIFT
+}
+
+enum ShopCategory {
+  FRAME
+  ENTRANCE_EFFECT
+  CHAT_BUBBLE
+  MIC_DECORATION
+  VEHICLE
+  ROOM_THEME
+  PROFILE_BACKGROUND
+  NAMEPLATE
+  NOBLE_BADGE
+  GIFT_SKIN
 }
 
 enum Currency {
@@ -258,6 +296,17 @@ model User {
   luckyEntries         LuckyGiftEntry[]
   luckyResults         LuckyGiftResult[]     @relation("LuckyResultWinner")
   jackpotWins          JackpotWinner[]
+  nobleSubscription    UserNobleSubscription?
+  noblePurchases       NoblePurchase[]
+  nobleSent            NobleGift[]           @relation("NobleSender")
+  nobleReceived        NobleGift[]           @relation("NobleReceiver")
+  medals               UserMedal[]
+  prestigeSnapshot     UserPrestigeSnapshot?
+  medalWallSlots       MedalWallSlot[]
+  shopItems            UserShopItem[]
+  shopPurchases        ShopPurchase[]
+  roomThemes           UserRoomTheme[]
+  nameplates           UserNameplate[]
 
   @@index([phone])
   @@index([email])
@@ -1132,4 +1181,313 @@ model EntranceEffect {
 
   @@index([isActive])
   @@map("entrance_effects")
+}
+
+// ==================== NOBLE SYSTEM ====================
+
+model NoblePlan {
+  id                  String     @id @default(cuid())
+  tier                NobleTier  @unique
+  name                String
+  monthlyPriceCoins   Int        @default(0)
+  monthlyPriceDiamonds Int       @default(0)
+  badgeUrl            String?
+  frameUrl            String?
+  entranceEffectUrl   String?
+  profileCardUrl      String?
+  coloredNameStyle    String?
+  dailyCoins          Int        @default(0)
+  expBoostPercent     Int        @default(0)
+  giftDiscountPercent Int        @default(0)
+  exclusiveGiftAccess Boolean    @default(false)
+  roomIdentity        String?
+  isActive            Boolean    @default(true)
+  sortOrder           Int        @default(0)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  subscriptions UserNobleSubscription[]
+  purchases     NoblePurchase[]
+  gifts         NobleGift[]
+
+  @@map("noble_plans")
+}
+
+model UserNobleSubscription {
+  id         String    @id @default(cuid())
+  userId     String    @unique
+  planId     String
+  tier       NobleTier
+  startedAt  DateTime  @default(now())
+  expiresAt  DateTime
+  isActive   Boolean   @default(true)
+  autoRenew  Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan NoblePlan @relation(fields: [planId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([isActive])
+  @@map("user_noble_subscriptions")
+}
+
+model NoblePurchase {
+  id            String   @id @default(cuid())
+  userId        String
+  planId        String
+  months        Int      @default(1)
+  totalCoins    BigInt
+  transactionId String?
+  recipientId   String?
+  createdAt     DateTime @default(now())
+
+  user User      @relation(fields: [userId], references: [id])
+  plan NoblePlan @relation(fields: [planId], references: [id])
+
+  @@index([userId])
+  @@map("noble_purchases")
+}
+
+model NobleGift {
+  id          String    @id @default(cuid())
+  senderId    String
+  receiverId  String
+  planId      String
+  months      Int       @default(1)
+  message     String?
+  createdAt   DateTime  @default(now())
+
+  sender   User      @relation("NobleSender", fields: [senderId], references: [id])
+  receiver User      @relation("NobleReceiver", fields: [receiverId], references: [id])
+  plan     NoblePlan @relation(fields: [planId], references: [id])
+
+  @@index([senderId])
+  @@index([receiverId])
+  @@map("noble_gifts")
+}
+
+// ==================== MEDAL / PRESTIGE SYSTEM ====================
+
+model Medal {
+  id            String        @id @default(cuid())
+  name          String
+  description   String?
+  imageUrl      String
+  category      MedalCategory @default(ACHIEVEMENT)
+  grade         AssetGrade    @default(C)
+  prestigeValue Int           @default(0)
+  isActive      Boolean       @default(true)
+  isPaid        Boolean       @default(false)
+  priceCoins    Int           @default(0)
+  sortOrder     Int           @default(0)
+  createdAt     DateTime      @default(now())
+
+  userMedals   UserMedal[]
+  wallSlots    MedalWallSlot[]
+
+  @@index([category])
+  @@index([grade])
+  @@index([isActive])
+  @@map("medals")
+}
+
+model UserMedal {
+  id           String    @id @default(cuid())
+  userId       String
+  medalId      String
+  equippedSlot Int?
+  unlockedAt   DateTime  @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  medal Medal @relation(fields: [medalId], references: [id])
+
+  @@unique([userId, medalId])
+  @@index([userId])
+  @@map("user_medals")
+}
+
+model PrestigeLevelRule {
+  id            String   @id @default(cuid())
+  level         Int      @unique
+  requiredPoints Int
+  rewardCoins   Int      @default(0)
+  rewardBadgeUrl String?
+
+  @@map("prestige_level_rules")
+}
+
+model UserPrestigeSnapshot {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  totalPoints  Int      @default(0)
+  level        Int      @default(0)
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_prestige_snapshots")
+}
+
+model MedalWallSlot {
+  id        String   @id @default(cuid())
+  userId    String
+  slotIndex Int
+  medalId   String?
+  updatedAt DateTime @updatedAt
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  medal Medal? @relation(fields: [medalId], references: [id])
+
+  @@unique([userId, slotIndex])
+  @@index([userId])
+  @@map("medal_wall_slots")
+}
+
+// ==================== SHOP SYSTEM ====================
+
+model ShopItem {
+  id             String       @id @default(cuid())
+  category       ShopCategory
+  title          String
+  description    String?
+  imageUrl       String
+  animationUrl   String?
+  animationType  String?
+  grade          AssetGrade   @default(C)
+  priceCoins     Int          @default(0)
+  priceDiamonds  Int          @default(0)
+  durationDays   Int?
+  isPermanent    Boolean      @default(false)
+  vipRequired    Int          @default(0)
+  nobleRequired  String?
+  levelRequired  Int          @default(0)
+  isActive       Boolean      @default(true)
+  sortOrder      Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  userItems UserShopItem[]
+  purchases ShopPurchase[]
+
+  @@index([category])
+  @@index([grade])
+  @@index([isActive])
+  @@map("shop_items")
+}
+
+model UserShopItem {
+  id           String    @id @default(cuid())
+  userId       String
+  itemId       String
+  purchasedAt  DateTime  @default(now())
+  expiresAt    DateTime?
+  isEquipped   Boolean   @default(false)
+
+  user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item ShopItem @relation(fields: [itemId], references: [id])
+
+  @@unique([userId, itemId])
+  @@index([userId])
+  @@index([isEquipped])
+  @@map("user_shop_items")
+}
+
+model ShopPurchase {
+  id            String   @id @default(cuid())
+  userId        String
+  itemId        String
+  priceCoins    Int
+  priceDiamonds Int
+  transactionId String?
+  createdAt     DateTime @default(now())
+
+  user User     @relation(fields: [userId], references: [id])
+  item ShopItem @relation(fields: [itemId], references: [id])
+
+  @@index([userId])
+  @@index([itemId])
+  @@map("shop_purchases")
+}
+
+// ==================== ROOM THEMES ====================
+
+model RoomTheme {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  imageUrl     String
+  previewUrl   String?
+  grade        AssetGrade @default(C)
+  priceCoins   Int      @default(0)
+  priceDiamonds Int     @default(0)
+  durationDays Int?
+  isPermanent  Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  userThemes UserRoomTheme[]
+
+  @@index([isActive])
+  @@map("room_themes")
+}
+
+model UserRoomTheme {
+  id          String    @id @default(cuid())
+  userId      String
+  themeId     String
+  purchasedAt DateTime  @default(now())
+  expiresAt   DateTime?
+  isEquipped  Boolean   @default(false)
+
+  user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  theme RoomTheme @relation(fields: [themeId], references: [id])
+
+  @@unique([userId, themeId])
+  @@index([userId])
+  @@map("user_room_themes")
+}
+
+// ==================== NAMEPLATES ====================
+
+model Nameplate {
+  id           String     @id @default(cuid())
+  name         String
+  description  String?
+  imageUrl     String
+  grade        AssetGrade @default(C)
+  priceCoins   Int        @default(0)
+  priceDiamonds Int       @default(0)
+  durationDays Int?
+  isPermanent  Boolean    @default(false)
+  levelRequired Int       @default(0)
+  isActive     Boolean    @default(true)
+  sortOrder    Int        @default(0)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  userNameplates UserNameplate[]
+
+  @@index([isActive])
+  @@map("nameplates")
+}
+
+model UserNameplate {
+  id           String    @id @default(cuid())
+  userId       String
+  nameplateId  String
+  purchasedAt  DateTime  @default(now())
+  expiresAt    DateTime?
+  isEquipped   Boolean   @default(false)
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nameplate Nameplate @relation(fields: [nameplateId], references: [id])
+
+  @@unique([userId, nameplateId])
+  @@index([userId])
+  @@map("user_nameplates")
 }
