@@ -463,6 +463,48 @@ class ApiClient {
   async deleteShopItem(id: string): Promise<void> {
     return this.request({ url: `/admin/shop/items/${id}`, method: 'DELETE' })
   }
+
+  // ============ MEDALS ============
+  async getMedals(params?: { category?: string; limit?: number }): Promise<any> {
+    return this.request({ url: '/admin/medals', method: 'GET', params })
+  }
+  async createMedal(data: Record<string, any>): Promise<any> {
+    return this.request({ url: '/admin/medals', method: 'POST', data })
+  }
+  async updateMedal(id: string, data: Record<string, any>): Promise<any> {
+    return this.request({ url: `/admin/medals/${id}`, method: 'PATCH', data })
+  }
+  async deleteMedal(id: string): Promise<void> {
+    return this.request({ url: `/admin/medals/${id}`, method: 'DELETE' })
+  }
+
+  // ============ ROOM THEMES ============
+  async getRoomThemes(): Promise<any[]> {
+    return this.request({ url: '/admin/room-themes', method: 'GET' })
+  }
+  async createRoomTheme(data: Record<string, any>): Promise<any> {
+    return this.request({ url: '/admin/room-themes', method: 'POST', data })
+  }
+  async updateRoomTheme(id: string, data: Record<string, any>): Promise<any> {
+    return this.request({ url: `/admin/room-themes/${id}`, method: 'PATCH', data })
+  }
+  async deleteRoomTheme(id: string): Promise<void> {
+    return this.request({ url: `/admin/room-themes/${id}`, method: 'DELETE' })
+  }
+
+  // ============ NAMEPLATES ============
+  async getNameplates(): Promise<any[]> {
+    return this.request({ url: '/admin/nameplates', method: 'GET' })
+  }
+  async createNameplate(data: Record<string, any>): Promise<any> {
+    return this.request({ url: '/admin/nameplates', method: 'POST', data })
+  }
+  async updateNameplate(id: string, data: Record<string, any>): Promise<any> {
+    return this.request({ url: `/admin/nameplates/${id}`, method: 'PATCH', data })
+  }
+  async deleteNameplate(id: string): Promise<void> {
+    return this.request({ url: `/admin/nameplates/${id}`, method: 'DELETE' })
+  }
 }
 
 export const api = new ApiClient()

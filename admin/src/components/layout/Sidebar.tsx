@@ -28,6 +28,9 @@ import {
   ChevronUpIcon,
   SparklesIcon,
   ShoppingBagIcon,
+  TrophyIcon,
+  SwatchIcon,
+  IdentificationIcon,
 } from '@heroicons/react/24/outline'
 
 interface NavItem {
@@ -94,6 +97,21 @@ const navItems: NavItem[] = [
     label: 'Shop Items',
     href: '/shop',
     icon: ShoppingBagIcon,
+  },
+  {
+    label: 'Medals',
+    href: '/medals',
+    icon: TrophyIcon,
+  },
+  {
+    label: 'Room Themes',
+    href: '/room-themes',
+    icon: SwatchIcon,
+  },
+  {
+    label: 'Nameplates',
+    href: '/nameplates',
+    icon: IdentificationIcon,
   },
   {
     label: 'Agencies',
