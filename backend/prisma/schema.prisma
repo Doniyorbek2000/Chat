@@ -248,6 +248,104 @@ enum DeletionStatus {
   COMPLETED
 }
 
+enum MissionPeriod {
+  DAILY
+  WEEKLY
+  SPECIAL
+}
+
+enum MissionActionType {
+  LOGIN
+  SEND_GIFT
+  JOIN_ROOM
+  HOST_ROOM
+  LIKE_POST
+  COMMENT_POST
+  ADD_FRIEND
+  STREAK_3
+  SEND_MESSAGE
+}
+
+enum MissionRewardType {
+  COINS
+  DIAMONDS
+  VIP_POINTS
+  EXP
+  TICKET
+}
+
+enum HostLevelTier {
+  ROOKIE
+  BRONZE
+  SILVER
+  GOLD
+  PLATINUM
+  DIAMOND
+  LEGEND
+}
+
+enum PkSeasonStatus {
+  UPCOMING
+  ACTIVE
+  ENDED
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum RiskActionType {
+  FLAG
+  WARN
+  RESTRICT_WITHDRAWAL
+  SUSPEND
+  BAN
+}
+
+enum RiskEventType {
+  MULTI_ACCOUNT
+  SELF_REFERRAL
+  CIRCULAR_GIFT
+  GIFT_SPAM
+  SUSPICIOUS_WITHDRAWAL
+  DEVICE_FRAUD
+  IP_FRAUD
+  WEBHOOK_REPLAY
+}
+
+enum BadgeType {
+  PHONE_VERIFIED
+  EMAIL_VERIFIED
+  VERIFIED_HOST
+  VERIFIED_AGENCY
+  OFFICIAL
+  SAFE_ROOM
+  TOP_CREATOR
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PayoutStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PROCESSING
+  COMPLETED
+}
+
+enum EarningType {
+  GIFT_INCOME
+  BONUS
+  ADJUSTMENT
+}
+
 // ==================== USER ====================
 
 model User {
@@ -351,6 +449,30 @@ model User {
   supportReplies       SupportReply[]
   uploadedLogs         UploadedLog[]
   deletionRequest      AccountDeletionRequest?
+  missionProgress      UserMissionProgress[]
+  riskEvents           RiskEvent[]
+  riskScore            RiskScore?
+  userDevices          UserDevice[]
+  ipLogs               UserIpLog[]
+  verificationBadges   UserVerificationBadge[]
+  hostProfile          HostProfile?
+  agencyHost           AgencyHost?
+  hostEarnings         HostEarning[]
+  hostPayouts          HostPayout[]
+  pkSeasonStats        PkSeasonParticipant[]
+  pkHistoryAsHostA     PkBattleHistory[]      @relation("PkHistoryHostA")
+  pkHistoryAsHostB     PkBattleHistory[]      @relation("PkHistoryHostB")
+  pkHistoryWins        PkBattleHistory[]      @relation("PkHistoryWinner")
+  roomModeratorOf      RoomModerator[]        @relation("RoomModeratorUser")
+  roomBannedIn         RoomBan[]              @relation("RoomBannedUser")
+  roomMutedIn          RoomMute[]             @relation("RoomMutedUser")
+  addedModerators      RoomModerator[]        @relation("RoomModeratorAdder")
+  issuedRoomBans       RoomBan[]              @relation("RoomBanner")
+  issuedRoomMutes      RoomMute[]             @relation("RoomMuter")
+  roomModerationActions RoomModerationLog[]
+  roomSupporterSnapshots RoomSupporterSnapshot[]
+  roomSessionGiftStats   RoomSessionGiftStat[]
+  hostRankingSnapshots   HostRankingSnapshot[]
 
   @@index([phone])
   @@index([email])
@@ -473,6 +595,15 @@ model VoiceRoom {
   gifts   GiftTransaction[]
   pkBattlesAsRoom1 PkBattle[] @relation("PkRoom1")
   pkBattlesAsRoom2 PkBattle[] @relation("PkRoom2")
+  supporterSnapshots     RoomSupporterSnapshot[]
+  sessionGiftStats       RoomSessionGiftStat[]
+  roomModerators         RoomModerator[]
+  roomBans               RoomBan[]
+  roomMutes              RoomMute[]
+  keywordFilters         RoomKeywordFilter[]
+  moderationLogs         RoomModerationLog[]
+  slowMode               RoomSlowModeSetting?
+  roomVerificationBadges RoomVerificationBadge[]
 
   @@index([hostId])
   @@index([type])
@@ -828,6 +959,9 @@ model Agency {
 
   owner   User           @relation("AgencyOwner", fields: [ownerId], references: [id])
   members AgencyMember[]
+  agencyHosts              AgencyHost[]
+  salaryRules              HostSalaryRule[]
+  agencyVerificationBadges AgencyVerificationBadge[]
 
   @@index([country])
   @@map("agencies")
@@ -1894,4 +2028,552 @@ model AccountDeletionRequest {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("account_deletion_requests")
+}
+
+// ==================== STAGE 9: LIVE ROOM TOP SUPPORTERS ====================
+
+model RoomSupporterSnapshot {
+  id         String   @id @default(cuid())
+  roomId     String
+  userId     String
+  period     String   // session|daily|weekly|monthly|all
+  giftValue  BigInt   @default(0)
+  giftCount  Int      @default(0)
+  rank       Int      @default(0)
+  snapshotAt DateTime @default(now())
+
+  room VoiceRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, period])
+  @@index([userId])
+  @@map("room_supporter_snapshots")
+}
+
+model RoomSessionGiftStat {
+  id         String   @id @default(cuid())
+  roomId     String
+  userId     String
+  sessionKey String   // date-based key e.g. "2024-01-15"
+  giftValue  BigInt   @default(0)
+  giftCount  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  room VoiceRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId, sessionKey])
+  @@index([roomId, sessionKey])
+  @@map("room_session_gift_stats")
+}
+
+// ==================== STAGE 9: HOST LEVEL ====================
+
+model HostProfile {
+  id               String        @id @default(cuid())
+  userId           String        @unique
+  level            Int           @default(1)
+  tier             HostLevelTier @default(ROOKIE)
+  xp               Int           @default(0)
+  totalLiveMinutes Int           @default(0)
+  totalViewers     Int           @default(0)
+  totalGiftValue   BigInt        @default(0)
+  totalFollowers   Int           @default(0)
+  pkWins           Int           @default(0)
+  isVerified       Boolean       @default(false)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dailyStats HostDailyStat[]
+
+  @@map("host_profiles")
+}
+
+model HostLevelRule {
+  id          String        @id @default(cuid())
+  level       Int           @unique
+  tier        HostLevelTier
+  minXp       Int
+  maxXp       Int
+  title       String
+  rewardCoins BigInt        @default(0)
+  createdAt   DateTime      @default(now())
+
+  @@map("host_level_rules")
+}
+
+model HostDailyStat {
+  id            String      @id @default(cuid())
+  hostProfileId String
+  date          DateTime    @db.Date
+  liveMinutes   Int         @default(0)
+  viewers       Int         @default(0)
+  giftValue     BigInt      @default(0)
+  newFollowers  Int         @default(0)
+  pkWins        Int         @default(0)
+  xpEarned      Int         @default(0)
+  createdAt     DateTime    @default(now())
+
+  hostProfile HostProfile @relation(fields: [hostProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([hostProfileId, date])
+  @@index([hostProfileId])
+  @@map("host_daily_stats")
+}
+
+model HostRankingSnapshot {
+  id         String   @id @default(cuid())
+  userId     String
+  period     String   // daily|weekly|monthly
+  rank       Int
+  score      BigInt   @default(0)
+  snapshotAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([period, rank])
+  @@index([userId, period])
+  @@map("host_ranking_snapshots")
+}
+
+// ==================== STAGE 9: DAILY MISSIONS ====================
+
+model Mission {
+  id           String            @id @default(cuid())
+  title        String
+  description  String?
+  period       MissionPeriod
+  actionType   MissionActionType
+  targetCount  Int               @default(1)
+  rewardType   MissionRewardType
+  rewardAmount BigInt            @default(0)
+  isActive     Boolean           @default(true)
+  sortOrder    Int               @default(0)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  progress UserMissionProgress[]
+
+  @@index([period, isActive])
+  @@map("missions")
+}
+
+model UserMissionProgress {
+  id        String    @id @default(cuid())
+  userId    String
+  missionId String
+  progress  Int       @default(0)
+  isClaimed Boolean   @default(false)
+  claimedAt DateTime?
+  periodKey String    // "2024-01-15" for daily, "2024-W03" for weekly
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, missionId, periodKey])
+  @@index([userId, periodKey])
+  @@map("user_mission_progress")
+}
+
+// ==================== STAGE 9: PK BATTLE SEASON ====================
+
+model PkSeason {
+  id          String         @id @default(cuid())
+  name        String
+  status      PkSeasonStatus @default(UPCOMING)
+  startAt     DateTime
+  endAt       DateTime
+  description String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  participants PkSeasonParticipant[]
+  rewards      PkSeasonReward[]
+  battleHistory PkBattleHistory[]
+
+  @@index([status])
+  @@map("pk_seasons")
+}
+
+model PkSeasonParticipant {
+  id         String   @id @default(cuid())
+  seasonId   String
+  userId     String
+  wins       Int      @default(0)
+  losses     Int      @default(0)
+  winStreak  Int      @default(0)
+  maxStreak  Int      @default(0)
+  totalScore BigInt   @default(0)
+  rank       Int?
+  isRewarded Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  season PkSeason @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([seasonId, userId])
+  @@index([seasonId, totalScore])
+  @@map("pk_season_participants")
+}
+
+model PkSeasonReward {
+  id           String   @id @default(cuid())
+  seasonId     String
+  rankFrom     Int
+  rankTo       Int
+  rewardType   String
+  rewardAmount BigInt   @default(0)
+  description  String?
+
+  season PkSeason @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  @@map("pk_season_rewards")
+}
+
+model PkBattleHistory {
+  id         String    @id @default(cuid())
+  battleId   String
+  seasonId   String?
+  hostAId    String
+  hostBId    String
+  winnerId   String?
+  hostAScore BigInt    @default(0)
+  hostBScore BigInt    @default(0)
+  duration   Int       @default(0)
+  createdAt  DateTime  @default(now())
+
+  hostA  User      @relation("PkHistoryHostA", fields: [hostAId], references: [id])
+  hostB  User      @relation("PkHistoryHostB", fields: [hostBId], references: [id])
+  winner User?     @relation("PkHistoryWinner", fields: [winnerId], references: [id])
+  season PkSeason? @relation(fields: [seasonId], references: [id])
+
+  @@index([hostAId])
+  @@index([hostBId])
+  @@index([seasonId])
+  @@map("pk_battle_histories")
+}
+
+// ==================== STAGE 9: AGENCY HOST SALARY ====================
+
+model AgencyHost {
+  id             String   @id @default(cuid())
+  agencyId       String
+  userId         String   @unique
+  commissionRate Float    @default(0.2)
+  isActive       Boolean  @default(true)
+  joinedAt       DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  agency   Agency       @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  earnings HostEarning[]
+  payouts  HostPayout[]
+
+  @@unique([agencyId, userId])
+  @@index([agencyId])
+  @@map("agency_hosts")
+}
+
+model HostEarning {
+  id           String      @id @default(cuid())
+  agencyHostId String
+  userId       String
+  type         EarningType
+  giftTxId     String?
+  grossAmount  BigInt      @default(0)
+  commission   BigInt      @default(0)
+  netAmount    BigInt      @default(0)
+  periodKey    String      // "2024-01" monthly
+  createdAt    DateTime    @default(now())
+
+  agencyHost AgencyHost @relation(fields: [agencyHostId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([agencyHostId, periodKey])
+  @@index([userId, periodKey])
+  @@map("host_earnings")
+}
+
+model HostPayout {
+  id           String       @id @default(cuid())
+  agencyHostId String
+  userId       String
+  amount       BigInt       @default(0)
+  status       PayoutStatus @default(PENDING)
+  approvedBy   String?
+  approvedAt   DateTime?
+  note         String?
+  periodKey    String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  agencyHost AgencyHost @relation(fields: [agencyHostId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([agencyHostId, status])
+  @@index([userId, status])
+  @@map("host_payouts")
+}
+
+model HostSalaryRule {
+  id             String   @id @default(cuid())
+  agencyId       String
+  minGiftValue   BigInt   @default(0)
+  commissionRate Float    @default(0.2)
+  bonusRate      Float    @default(0.0)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId])
+  @@map("host_salary_rules")
+}
+
+// ==================== STAGE 9: ANTI-FRAUD / RISK ENGINE ====================
+
+model UserDevice {
+  id         String   @id @default(cuid())
+  userId     String
+  deviceId   String
+  deviceInfo String?
+  platform   String?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceId])
+  @@index([deviceId])
+  @@map("user_devices")
+}
+
+model UserIpLog {
+  id        String   @id @default(cuid())
+  userId    String
+  ipAddress String
+  action    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([ipAddress])
+  @@map("user_ip_logs")
+}
+
+model RiskRule {
+  id          String         @id @default(cuid())
+  name        String
+  eventType   RiskEventType
+  scoreDelta  Int            @default(10)
+  action      RiskActionType?
+  threshold   Int            @default(100)
+  isActive    Boolean        @default(true)
+  description String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  events RiskEvent[]
+
+  @@map("risk_rules")
+}
+
+model RiskEvent {
+  id         String        @id @default(cuid())
+  userId     String
+  ruleId     String?
+  eventType  RiskEventType
+  scoreDelta Int           @default(0)
+  metadata   Json?
+  createdAt  DateTime      @default(now())
+
+  user User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rule RiskRule? @relation(fields: [ruleId], references: [id])
+
+  @@index([userId])
+  @@index([eventType])
+  @@map("risk_events")
+}
+
+model RiskScore {
+  id        String    @id @default(cuid())
+  userId    String    @unique
+  score     Int       @default(0)
+  level     RiskLevel @default(LOW)
+  isFlagged Boolean   @default(false)
+  flaggedAt DateTime?
+  flaggedBy String?
+  clearedAt DateTime?
+  updatedAt DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("risk_scores")
+}
+
+// ==================== STAGE 9: ROOM MODERATOR TOOLS ====================
+
+model RoomModerator {
+  id      String   @id @default(cuid())
+  roomId  String
+  userId  String
+  addedBy String
+  addedAt DateTime @default(now())
+
+  room  VoiceRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user  User      @relation("RoomModeratorUser", fields: [userId], references: [id], onDelete: Cascade)
+  adder User      @relation("RoomModeratorAdder", fields: [addedBy], references: [id])
+
+  @@unique([roomId, userId])
+  @@map("room_moderators")
+}
+
+model RoomBan {
+  id        String    @id @default(cuid())
+  roomId    String
+  userId    String
+  bannedBy  String
+  reason    String?
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+
+  room   VoiceRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user   User      @relation("RoomBannedUser", fields: [userId], references: [id], onDelete: Cascade)
+  banner User      @relation("RoomBanner", fields: [bannedBy], references: [id])
+
+  @@unique([roomId, userId])
+  @@map("room_bans")
+}
+
+model RoomMute {
+  id        String    @id @default(cuid())
+  roomId    String
+  userId    String
+  mutedBy   String
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+
+  room  VoiceRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user  User      @relation("RoomMutedUser", fields: [userId], references: [id], onDelete: Cascade)
+  muter User      @relation("RoomMuter", fields: [mutedBy], references: [id])
+
+  @@unique([roomId, userId])
+  @@map("room_mutes")
+}
+
+model RoomKeywordFilter {
+  id        String   @id @default(cuid())
+  roomId    String
+  keyword   String
+  addedBy   String
+  createdAt DateTime @default(now())
+
+  room VoiceRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, keyword])
+  @@map("room_keyword_filters")
+}
+
+model RoomModerationLog {
+  id        String   @id @default(cuid())
+  roomId    String
+  actorId   String
+  targetId  String?
+  action    String
+  reason    String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  room  VoiceRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  actor User      @relation(fields: [actorId], references: [id])
+
+  @@index([roomId])
+  @@index([actorId])
+  @@map("room_moderation_logs")
+}
+
+model RoomSlowModeSetting {
+  id          String   @id @default(cuid())
+  roomId      String   @unique
+  isEnabled   Boolean  @default(false)
+  intervalSec Int      @default(5)
+  giftOnly    Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+
+  room VoiceRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@map("room_slow_mode_settings")
+}
+
+// ==================== STAGE 9: VERIFICATION BADGE ====================
+
+model VerificationBadge {
+  id          String    @id @default(cuid())
+  type        BadgeType @unique
+  name        String
+  icon        String?
+  description String?
+  createdAt   DateTime  @default(now())
+
+  userBadges   UserVerificationBadge[]
+  agencyBadges AgencyVerificationBadge[]
+  roomBadges   RoomVerificationBadge[]
+
+  @@map("verification_badges")
+}
+
+model UserVerificationBadge {
+  id        String             @id @default(cuid())
+  userId    String
+  badgeId   String
+  status    VerificationStatus @default(PENDING)
+  grantedBy String?
+  grantedAt DateTime?
+  expiresAt DateTime?
+  createdAt DateTime           @default(now())
+
+  user  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge VerificationBadge @relation(fields: [badgeId], references: [id])
+
+  @@unique([userId, badgeId])
+  @@index([userId])
+  @@map("user_verification_badges")
+}
+
+model AgencyVerificationBadge {
+  id        String             @id @default(cuid())
+  agencyId  String
+  badgeId   String
+  status    VerificationStatus @default(PENDING)
+  grantedBy String?
+  grantedAt DateTime?
+  createdAt DateTime           @default(now())
+
+  agency Agency            @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  badge  VerificationBadge @relation(fields: [badgeId], references: [id])
+
+  @@unique([agencyId, badgeId])
+  @@map("agency_verification_badges")
+}
+
+model RoomVerificationBadge {
+  id        String             @id @default(cuid())
+  roomId    String
+  badgeId   String
+  status    VerificationStatus @default(PENDING)
+  grantedBy String?
+  grantedAt DateTime?
+  createdAt DateTime           @default(now())
+
+  room  VoiceRoom         @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  badge VerificationBadge @relation(fields: [badgeId], references: [id])
+
+  @@unique([roomId, badgeId])
+  @@map("room_verification_badges")
 }
