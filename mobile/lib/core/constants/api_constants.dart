@@ -136,6 +136,16 @@ class ApiConstants {
   static const String settings = '/settings';
   static const String privacySettings = '/settings/privacy';
   static const String notificationSettings2 = '/settings/notifications';
+  static const String settingsMe = '/settings/me';
+  static const String settingsBlocked = '/settings/blocked';
+  static const String settingsDeletionRequest = '/settings/deletion-request';
+  static const String settingsLogsUpload = '/settings/logs/upload';
+  static const String settingsLinkedAccounts = '/settings/linked-accounts';
+  static const String changePassword = '/auth/change-password';
+
+  // Support
+  static const String supportTickets = '/support/tickets';
+  static const String supportPolicies = '/support/policies';
 
   // Reports
   static const String reportUser = '/reports/user';

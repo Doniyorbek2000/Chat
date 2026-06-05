@@ -23,6 +23,13 @@ import '../../features/messages/presentation/screens/messages_screen.dart';
 import '../../features/messages/presentation/screens/chat_screen.dart';
 import '../../features/notifications/presentation/screens/notifications_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
+import '../../features/settings/presentation/screens/language_screen.dart';
+import '../../features/settings/presentation/screens/blocked_users_screen.dart';
+import '../../features/settings/presentation/screens/policy_screen.dart';
+import '../../features/settings/presentation/screens/feedback_screen.dart';
+import '../../features/settings/presentation/screens/delete_account_screen.dart';
+import '../../features/settings/presentation/screens/change_password_screen.dart';
+import '../../features/settings/presentation/screens/linked_accounts_screen.dart';
 import '../../features/agency/presentation/screens/agency_screen.dart';
 import '../../features/couple/presentation/screens/couple_screen.dart';
 import '../../features/events/presentation/screens/events_screen.dart';
@@ -77,6 +84,15 @@ class AppRoutes {
   static const String referral = '/referral';
   static const String search = '/search';
   static const String createPost = '/create-post';
+
+  // Settings sub-routes
+  static const String settingsLanguage = '/settings/language';
+  static const String settingsBlocked = '/settings/blocked';
+  static const String settingsPolicy = '/settings/policy/:slug';
+  static const String settingsFeedback = '/settings/feedback';
+  static const String settingsDeleteAccount = '/settings/delete-account';
+  static const String settingsChangePassword = '/settings/change-password';
+  static const String settingsLinkedAccounts = '/settings/linked-accounts';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -369,6 +385,60 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.createPost,
         pageBuilder: (context, state) => _buildPage(state, const CreatePostScreen()),
+      ),
+
+      // Settings sub-routes
+      GoRoute(
+        path: AppRoutes.settingsLanguage,
+        pageBuilder: (context, state) => _buildPage(
+          state,
+          const LanguageScreen(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.settingsBlocked,
+        pageBuilder: (context, state) => _buildPage(
+          state,
+          const BlockedUsersScreen(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.settingsPolicy,
+        pageBuilder: (context, state) {
+          final slug = state.pathParameters['slug']!;
+          return _buildPage(
+            state,
+            PolicyScreen(slug: slug),
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.settingsFeedback,
+        pageBuilder: (context, state) => _buildPage(
+          state,
+          const FeedbackScreen(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.settingsDeleteAccount,
+        pageBuilder: (context, state) => _buildPage(
+          state,
+          const DeleteAccountScreen(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.settingsChangePassword,
+        pageBuilder: (context, state) => _buildPage(
+          state,
+          const ChangePasswordScreen(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.settingsLinkedAccounts,
+        pageBuilder: (context, state) => _buildPage(
+          state,
+          const LinkedAccountsScreen(),
+        ),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(
