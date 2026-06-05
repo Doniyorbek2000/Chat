@@ -47,6 +47,21 @@ export class AdminController {
     return this.adminService.getDashboardStats();
   }
 
+  @Get('dashboard/stats')
+  getDashboardStats() {
+    return this.adminService.getDashboardStats();
+  }
+
+  @Get('dashboard/top-rooms')
+  getDashboardTopRooms() {
+    return this.adminService.getDashboardTopRooms();
+  }
+
+  @Get('dashboard/recent-transactions')
+  getDashboardRecentTransactions() {
+    return this.adminService.getDashboardRecentTransactions();
+  }
+
   @Get('stats')
   getStats() {
     return this.adminService.getStats();
@@ -97,6 +112,239 @@ export class AdminController {
   @Delete('users/:id/ban')
   unbanUser(@CurrentUser('id') adminId: string, @Param('id') userId: string) {
     return this.adminService.unbanUser(adminId, userId);
+  }
+
+  @Post('users/:id/unban')
+  unbanUserPost(@CurrentUser('id') adminId: string, @Param('id') userId: string) {
+    return this.adminService.unbanUser(adminId, userId);
+  }
+
+  @Get('users/:id/bans')
+  getUserBans(@Param('id') userId: string) {
+    return this.adminService.getUserBans(userId);
+  }
+
+  @Get('users/:id/transactions')
+  getUserTransactions(
+    @Param('id') userId: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page = 1,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit = 20,
+  ) {
+    return this.adminService.getUserTransactions(userId, page, limit);
+  }
+
+  @Post('users/:id/wallet/adjust')
+  @Roles(Role.SUPER_ADMIN)
+  adjustUserWallet(
+    @CurrentUser('id') adminId: string,
+    @Param('id') userId: string,
+    @Body() dto: { currency: 'coins' | 'diamonds'; amount: number; reason: string },
+  ) {
+    return this.adminService.adjustUserWallet(adminId, userId, dto);
+  }
+
+  // ==================== ROOMS (ADMIN) ====================
+
+  @Get('rooms')
+  getRooms(
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+    @Query('type') type?: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page = 1,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit = 20,
+  ) {
+    return this.adminService.getRooms({ search, status, type, page, limit });
+  }
+
+  @Get('rooms/:id')
+  getRoomById(@Param('id') id: string) {
+    return this.adminService.getRoomById(id);
+  }
+
+  @Get('rooms/:id/members')
+  getRoomMembers(@Param('id') id: string) {
+    return this.adminService.getRoomMembers(id);
+  }
+
+  @Post('rooms/:id/close')
+  closeRoom(@CurrentUser('id') adminId: string, @Param('id') roomId: string) {
+    return this.adminService.closeRoom(adminId, roomId);
+  }
+
+  // ==================== FAMILIES (ADMIN) ====================
+
+  @Get('families')
+  getFamilies(
+    @Query('search') search?: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page = 1,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit = 20,
+  ) {
+    return this.adminService.getFamilies({ search, page, limit });
+  }
+
+  @Get('families/:id')
+  getFamilyById(@Param('id') id: string) {
+    return this.adminService.getFamilyById(id);
+  }
+
+  @Post('families/:id/ban')
+  banFamily(
+    @CurrentUser('id') adminId: string,
+    @Param('id') familyId: string,
+    @Body('reason') reason: string,
+  ) {
+    return this.adminService.banFamily(adminId, familyId, reason);
+  }
+
+  @Post('families/:id/unban')
+  unbanFamily(@CurrentUser('id') adminId: string, @Param('id') familyId: string) {
+    return this.adminService.unbanFamily(adminId, familyId);
+  }
+
+  // ==================== AGENCIES (ADMIN) ====================
+
+  @Get('agencies')
+  getAgencies(
+    @Query('search') search?: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page = 1,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit = 20,
+  ) {
+    return this.adminService.getAgencies({ search, page, limit });
+  }
+
+  @Get('agencies/:id')
+  getAgencyById(@Param('id') id: string) {
+    return this.adminService.getAgencyById(id);
+  }
+
+  // ==================== REPORTS (ADMIN) ====================
+
+  @Get('reports')
+  getReports(
+    @Query('status') status?: string,
+    @Query('type') type?: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page = 1,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit = 20,
+  ) {
+    return this.adminService.getReports({ status, type, page, limit });
+  }
+
+  @Get('reports/:id')
+  getReportById(@Param('id') id: string) {
+    return this.adminService.getReportById(id);
+  }
+
+  @Post('reports/:id/resolve')
+  resolveModReport(
+    @CurrentUser('id') adminId: string,
+    @Param('id') reportId: string,
+    @Body() dto: { action?: string; adminNote?: string },
+  ) {
+    return this.adminService.resolveReport(adminId, reportId, dto);
+  }
+
+  @Post('reports/:id/dismiss')
+  dismissReport(
+    @CurrentUser('id') adminId: string,
+    @Param('id') reportId: string,
+    @Body() dto: { note?: string },
+  ) {
+    return this.adminService.dismissReport(adminId, reportId, dto);
+  }
+
+  // ==================== BANNERS (ADMIN) ====================
+
+  @Get('banners')
+  getBanners() {
+    return this.adminService.getBanners();
+  }
+
+  @Post('banners')
+  createBanner(@Body() data: any) {
+    return this.adminService.createBanner(data);
+  }
+
+  @Put('banners/:id')
+  updateBanner(@Param('id') id: string, @Body() data: any) {
+    return this.adminService.updateBanner(id, data);
+  }
+
+  @Patch('banners/:id')
+  patchBanner(@Param('id') id: string, @Body() data: any) {
+    return this.adminService.updateBanner(id, data);
+  }
+
+  @Delete('banners/:id')
+  deleteBanner(@Param('id') id: string) {
+    return this.adminService.deleteBanner(id);
+  }
+
+  @Patch('banners/:id/toggle')
+  toggleBanner(@Param('id') id: string) {
+    return this.adminService.toggleBanner(id);
+  }
+
+  // ==================== EVENTS (ADMIN) ====================
+
+  @Get('events')
+  getEvents(
+    @Query('isActive') isActive?: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page = 1,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit = 20,
+  ) {
+    return this.adminService.getEvents({
+      isActive: isActive !== undefined ? isActive === 'true' : undefined,
+      page,
+      limit,
+    });
+  }
+
+  @Get('events/:id')
+  getEventById(@Param('id') id: string) {
+    return this.adminService.getEventById(id);
+  }
+
+  @Post('events')
+  createEvent(@Body() data: any) {
+    return this.adminService.createEvent(data);
+  }
+
+  @Put('events/:id')
+  updateEvent(@Param('id') id: string, @Body() data: any) {
+    return this.adminService.updateEvent(id, data);
+  }
+
+  @Delete('events/:id')
+  deleteEvent(@Param('id') id: string) {
+    return this.adminService.deleteEvent(id);
+  }
+
+  // ==================== WALLET (ADMIN) ====================
+
+  @Get('wallets/stats')
+  getWalletStats() {
+    return this.adminService.getWalletStats();
+  }
+
+  @Get('wallets/transactions')
+  getWalletTransactions(
+    @Query('type') type?: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page = 1,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit = 20,
+  ) {
+    return this.adminService.getWalletTransactions({ type, page, limit });
+  }
+
+  // ==================== SETTINGS (ADMIN) ====================
+
+  @Get('settings')
+  getSettings() {
+    return this.adminService.getSettings();
+  }
+
+  @Put('settings')
+  updateSettings(@Body() data: any) {
+    return this.adminService.updateSettings(data);
   }
 
   // ==================== WITHDRAWALS ====================
@@ -358,7 +606,7 @@ export class AdminController {
 
   @Post('discover/reports/:id/resolve')
   @Roles(Role.ADMIN, Role.SUPER_ADMIN, Role.MODERATOR)
-  resolveReport(@Param('id') id: string) {
+  resolveDiscoverReport(@Param('id') id: string) {
     return this.discoverService.adminResolveReport(id);
   }
 

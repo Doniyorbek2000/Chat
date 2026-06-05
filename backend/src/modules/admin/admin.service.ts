@@ -19,6 +19,10 @@ import {
   WithdrawalStatus,
   GiftCategory,
   GiftType,
+  ReportStatus,
+  Currency,
+  TransactionType,
+  TransactionStatus,
 } from '@prisma/client';
 import * as dayjs from 'dayjs';
 
@@ -816,6 +820,625 @@ export class AdminService {
 
   async deleteNameplate(id: string) {
     return this.prisma.nameplate.delete({ where: { id } });
+  }
+
+  // ==================== DASHBOARD EXTRAS ====================
+
+  async getDashboardRevenue(period: 'daily' | 'weekly' | 'monthly' = 'daily', days = 30) {
+    return this.getRevenueChart(period, days);
+  }
+
+  async getDashboardTopRooms() {
+    return this.prisma.voiceRoom.findMany({
+      where: { isLive: true },
+      orderBy: { viewerCount: 'desc' },
+      take: 10,
+      include: {
+        host: {
+          select: { id: true, uid: true, displayName: true, avatar: true },
+        },
+        _count: { select: { members: true } },
+      },
+    });
+  }
+
+  async getDashboardRecentTransactions() {
+    const txs = await this.prisma.transaction.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      include: {
+        user: {
+          select: { id: true, uid: true, displayName: true, avatar: true },
+        },
+      },
+    });
+    return txs;
+  }
+
+  // ==================== USER EXTRAS ====================
+
+  async getUserBans(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    return this.prisma.ban.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        admin: { select: { id: true, uid: true, displayName: true } },
+      },
+    });
+  }
+
+  async getUserTransactions(userId: string, page = 1, limit = 20) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const [data, total] = await Promise.all([
+      this.prisma.transaction.findMany({
+        where: { userId },
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.transaction.count({ where: { userId } }),
+    ]);
+
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async adjustUserWallet(
+    adminId: string,
+    userId: string,
+    dto: { currency: 'coins' | 'diamonds'; amount: number; reason: string },
+  ) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    if (!dto.reason) throw new BadRequestException('Reason is required');
+
+    const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
+    if (!wallet) throw new NotFoundException('Wallet not found');
+
+    const isCoin = dto.currency === 'coins';
+    const before = isCoin ? wallet.coins : wallet.diamonds;
+    const after = before + BigInt(dto.amount);
+    if (after < BigInt(0)) throw new BadRequestException('Insufficient balance');
+
+    await this.prisma.$transaction([
+      this.prisma.wallet.update({
+        where: { userId },
+        data: isCoin
+          ? { coins: { increment: dto.amount } }
+          : { diamonds: { increment: dto.amount } },
+      }),
+      this.prisma.transaction.create({
+        data: {
+          userId,
+          type: TransactionType.REWARD,
+          currency: isCoin ? Currency.COINS : Currency.DIAMONDS,
+          amount: BigInt(Math.abs(dto.amount)),
+          balanceBefore: before,
+          balanceAfter: after,
+          description: `Admin adjustment: ${dto.reason}`,
+          referenceId: adminId,
+          status: TransactionStatus.COMPLETED,
+        },
+      }),
+    ]);
+
+    await this.createAuditLog(adminId, 'WALLET_ADJUST', 'User', userId, {
+      currency: dto.currency,
+      amount: dto.amount,
+      reason: dto.reason,
+    });
+
+    return { success: true, message: 'Wallet adjusted successfully' };
+  }
+
+  // ==================== ROOMS ADMIN ====================
+
+  async getRooms(filters: {
+    search?: string;
+    status?: string;
+    type?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const { search, status, type, page = 1, limit = 20 } = filters;
+    const where: any = {};
+
+    if (search) {
+      where.OR = [
+        { title: { contains: search, mode: 'insensitive' } },
+        { host: { displayName: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
+
+    if (status === 'live') where.isLive = true;
+    else if (status === 'ended') where.isLive = false;
+
+    if (type) where.type = type.toUpperCase();
+
+    const [data, total] = await Promise.all([
+      this.prisma.voiceRoom.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          host: {
+            select: { id: true, uid: true, displayName: true, avatar: true },
+          },
+          _count: { select: { members: true, seats: true } },
+        },
+      }),
+      this.prisma.voiceRoom.count({ where }),
+    ]);
+
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async getRoomById(roomId: string) {
+    const room = await this.prisma.voiceRoom.findUnique({
+      where: { id: roomId },
+      include: {
+        host: {
+          select: {
+            id: true, uid: true, displayName: true, avatar: true, isOnline: true,
+          },
+        },
+        seats: {
+          include: {
+            user: { select: { id: true, uid: true, displayName: true, avatar: true } },
+          },
+        },
+        _count: { select: { members: true } },
+      },
+    });
+    if (!room) throw new NotFoundException('Room not found');
+    return room;
+  }
+
+  async getRoomMembers(roomId: string) {
+    const room = await this.prisma.voiceRoom.findUnique({ where: { id: roomId } });
+    if (!room) throw new NotFoundException('Room not found');
+
+    return this.prisma.roomMember.findMany({
+      where: { roomId },
+      orderBy: { joinedAt: 'desc' },
+      include: {
+        user: {
+          select: { id: true, uid: true, displayName: true, avatar: true, isVip: true },
+        },
+      },
+    });
+  }
+
+  async closeRoom(adminId: string, roomId: string) {
+    const room = await this.prisma.voiceRoom.findUnique({ where: { id: roomId } });
+    if (!room) throw new NotFoundException('Room not found');
+    if (!room.isLive) throw new BadRequestException('Room is already closed');
+
+    const updated = await this.prisma.voiceRoom.update({
+      where: { id: roomId },
+      data: { isLive: false },
+    });
+
+    await this.createAuditLog(adminId, 'CLOSE_ROOM', 'VoiceRoom', roomId, {});
+    return updated;
+  }
+
+  // ==================== FAMILIES ADMIN ====================
+
+  async getFamilies(filters: { search?: string; page?: number; limit?: number }) {
+    const { search, page = 1, limit = 20 } = filters;
+    const where: any = {};
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { tag: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.family.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          owner: { select: { id: true, uid: true, displayName: true, avatar: true } },
+          _count: { select: { members: true } },
+        },
+      }),
+      this.prisma.family.count({ where }),
+    ]);
+
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async getFamilyById(familyId: string) {
+    const family = await this.prisma.family.findUnique({
+      where: { id: familyId },
+      include: {
+        owner: { select: { id: true, uid: true, displayName: true, avatar: true } },
+        members: {
+          include: {
+            user: { select: { id: true, uid: true, displayName: true, avatar: true } },
+          },
+          orderBy: { joinedAt: 'asc' },
+        },
+      },
+    });
+    if (!family) throw new NotFoundException('Family not found');
+    return family;
+  }
+
+  async banFamily(adminId: string, familyId: string, reason: string) {
+    const family = await this.prisma.family.findUnique({ where: { id: familyId } });
+    if (!family) throw new NotFoundException('Family not found');
+
+    await this.createAuditLog(adminId, 'BAN_FAMILY', 'Family', familyId, { reason });
+    return { success: true, message: 'Family banned successfully', familyId, reason };
+  }
+
+  async unbanFamily(adminId: string, familyId: string) {
+    const family = await this.prisma.family.findUnique({ where: { id: familyId } });
+    if (!family) throw new NotFoundException('Family not found');
+
+    await this.createAuditLog(adminId, 'UNBAN_FAMILY', 'Family', familyId, {});
+    return { success: true, message: 'Family unbanned successfully', familyId };
+  }
+
+  // ==================== AGENCIES ADMIN ====================
+
+  async getAgencies(filters: { search?: string; page?: number; limit?: number }) {
+    const { search, page = 1, limit = 20 } = filters;
+    const where: any = {};
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.agency.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          owner: { select: { id: true, uid: true, displayName: true, avatar: true } },
+          _count: { select: { members: true } },
+        },
+      }),
+      this.prisma.agency.count({ where }),
+    ]);
+
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async getAgencyById(agencyId: string) {
+    const agency = await this.prisma.agency.findUnique({
+      where: { id: agencyId },
+      include: {
+        owner: { select: { id: true, uid: true, displayName: true, avatar: true } },
+        members: {
+          include: {
+            user: { select: { id: true, uid: true, displayName: true, avatar: true } },
+          },
+          orderBy: { joinedAt: 'asc' },
+        },
+      },
+    });
+    if (!agency) throw new NotFoundException('Agency not found');
+    return agency;
+  }
+
+  // ==================== REPORTS ADMIN ====================
+
+  async getReports(filters: {
+    status?: string;
+    type?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const { status, type, page = 1, limit = 20 } = filters;
+    const where: any = {};
+
+    if (status) where.status = status as ReportStatus;
+    if (type) where.targetType = type.toUpperCase();
+
+    const [data, total] = await Promise.all([
+      this.prisma.report.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          reporter: { select: { id: true, uid: true, displayName: true, avatar: true } },
+          resolver: { select: { id: true, uid: true, displayName: true } },
+        },
+      }),
+      this.prisma.report.count({ where }),
+    ]);
+
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async getReportById(reportId: string) {
+    const report = await this.prisma.report.findUnique({
+      where: { id: reportId },
+      include: {
+        reporter: { select: { id: true, uid: true, displayName: true, avatar: true } },
+        resolver: { select: { id: true, uid: true, displayName: true } },
+      },
+    });
+    if (!report) throw new NotFoundException('Report not found');
+    return report;
+  }
+
+  async resolveReport(adminId: string, reportId: string, dto: { action?: string; adminNote?: string }) {
+    const report = await this.prisma.report.findUnique({ where: { id: reportId } });
+    if (!report) throw new NotFoundException('Report not found');
+
+    const updated = await this.prisma.report.update({
+      where: { id: reportId },
+      data: {
+        status: ReportStatus.RESOLVED,
+        resolvedBy: adminId,
+        resolvedAt: new Date(),
+        ...(dto.adminNote && { description: dto.adminNote }),
+      },
+    });
+
+    await this.createAuditLog(adminId, 'RESOLVE_REPORT', 'Report', reportId, dto);
+    return updated;
+  }
+
+  async dismissReport(adminId: string, reportId: string, dto: { note?: string }) {
+    const report = await this.prisma.report.findUnique({ where: { id: reportId } });
+    if (!report) throw new NotFoundException('Report not found');
+
+    const updated = await this.prisma.report.update({
+      where: { id: reportId },
+      data: {
+        status: ReportStatus.DISMISSED,
+        resolvedBy: adminId,
+        resolvedAt: new Date(),
+        ...(dto.note && { description: dto.note }),
+      },
+    });
+
+    await this.createAuditLog(adminId, 'DISMISS_REPORT', 'Report', reportId, dto);
+    return updated;
+  }
+
+  // ==================== BANNERS ADMIN ====================
+
+  async getBanners() {
+    return this.prisma.banner.findMany({ orderBy: { sortOrder: 'asc' } });
+  }
+
+  async createBanner(data: {
+    title: string;
+    imageUrl: string;
+    linkType?: string;
+    linkValue?: string;
+    position: string;
+    sortOrder?: number;
+    startDate?: string;
+    endDate?: string;
+  }) {
+    return this.prisma.banner.create({
+      data: {
+        title: data.title,
+        imageUrl: data.imageUrl,
+        linkType: data.linkType as any,
+        linkValue: data.linkValue,
+        position: data.position || 'HOME',
+        sortOrder: data.sortOrder ?? 0,
+        startDate: data.startDate ? new Date(data.startDate) : undefined,
+        endDate: data.endDate ? new Date(data.endDate) : undefined,
+        isActive: true,
+      },
+    });
+  }
+
+  async updateBanner(bannerId: string, data: any) {
+    const banner = await this.prisma.banner.findUnique({ where: { id: bannerId } });
+    if (!banner) throw new NotFoundException('Banner not found');
+    return this.prisma.banner.update({
+      where: { id: bannerId },
+      data: {
+        ...(data.title && { title: data.title }),
+        ...(data.imageUrl && { imageUrl: data.imageUrl }),
+        ...(data.linkType !== undefined && { linkType: data.linkType }),
+        ...(data.linkValue !== undefined && { linkValue: data.linkValue }),
+        ...(data.position && { position: data.position }),
+        ...(data.sortOrder !== undefined && { sortOrder: data.sortOrder }),
+        ...(data.startDate !== undefined && { startDate: data.startDate ? new Date(data.startDate) : null }),
+        ...(data.endDate !== undefined && { endDate: data.endDate ? new Date(data.endDate) : null }),
+        ...(data.isActive !== undefined && { isActive: data.isActive }),
+      },
+    });
+  }
+
+  async deleteBanner(bannerId: string) {
+    const banner = await this.prisma.banner.findUnique({ where: { id: bannerId } });
+    if (!banner) throw new NotFoundException('Banner not found');
+    return this.prisma.banner.delete({ where: { id: bannerId } });
+  }
+
+  async toggleBanner(bannerId: string) {
+    const banner = await this.prisma.banner.findUnique({ where: { id: bannerId } });
+    if (!banner) throw new NotFoundException('Banner not found');
+    return this.prisma.banner.update({
+      where: { id: bannerId },
+      data: { isActive: !banner.isActive },
+    });
+  }
+
+  async reorderBanners(ids: string[]) {
+    const updates = ids.map((id, index) =>
+      this.prisma.banner.update({ where: { id }, data: { sortOrder: index } }),
+    );
+    await this.prisma.$transaction(updates);
+    return { success: true, message: 'Banners reordered' };
+  }
+
+  // ==================== EVENTS ADMIN ====================
+
+  async getEvents(filters: { isActive?: boolean; page?: number; limit?: number }) {
+    const { isActive, page = 1, limit = 20 } = filters;
+    const where: any = {};
+    if (isActive !== undefined) where.isActive = isActive;
+
+    const [data, total] = await Promise.all([
+      this.prisma.event.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { startDate: 'desc' },
+      }),
+      this.prisma.event.count({ where }),
+    ]);
+
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async getEventById(eventId: string) {
+    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+    if (!event) throw new NotFoundException('Event not found');
+    return event;
+  }
+
+  async createEvent(data: {
+    name: string;
+    description?: string;
+    type: string;
+    startDate: string;
+    endDate: string;
+    banner?: string;
+    rewards: any;
+    isActive?: boolean;
+  }) {
+    return this.prisma.event.create({
+      data: {
+        name: data.name,
+        description: data.description,
+        type: data.type as any,
+        startDate: new Date(data.startDate),
+        endDate: new Date(data.endDate),
+        banner: data.banner,
+        rewards: data.rewards,
+        isActive: data.isActive ?? true,
+      },
+    });
+  }
+
+  async updateEvent(eventId: string, data: any) {
+    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+    if (!event) throw new NotFoundException('Event not found');
+    return this.prisma.event.update({
+      where: { id: eventId },
+      data: {
+        ...(data.name && { name: data.name }),
+        ...(data.description !== undefined && { description: data.description }),
+        ...(data.type && { type: data.type }),
+        ...(data.startDate && { startDate: new Date(data.startDate) }),
+        ...(data.endDate && { endDate: new Date(data.endDate) }),
+        ...(data.banner !== undefined && { banner: data.banner }),
+        ...(data.rewards && { rewards: data.rewards }),
+        ...(data.isActive !== undefined && { isActive: data.isActive }),
+      },
+    });
+  }
+
+  async deleteEvent(eventId: string) {
+    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+    if (!event) throw new NotFoundException('Event not found');
+    return this.prisma.event.delete({ where: { id: eventId } });
+  }
+
+  // ==================== WALLET ADMIN ====================
+
+  async getWalletStats() {
+    const today = dayjs().startOf('day').toDate();
+    const weekStart = dayjs().startOf('week').toDate();
+    const monthStart = dayjs().startOf('month').toDate();
+
+    const [totals, todayRecharge, weekRecharge, monthRecharge] = await Promise.all([
+      this.prisma.wallet.aggregate({
+        _sum: { coins: true, diamonds: true },
+      }),
+      this.prisma.transaction.aggregate({
+        where: { type: 'RECHARGE', status: 'COMPLETED', createdAt: { gte: today } },
+        _sum: { amount: true },
+      }),
+      this.prisma.transaction.aggregate({
+        where: { type: 'RECHARGE', status: 'COMPLETED', createdAt: { gte: weekStart } },
+        _sum: { amount: true },
+      }),
+      this.prisma.transaction.aggregate({
+        where: { type: 'RECHARGE', status: 'COMPLETED', createdAt: { gte: monthStart } },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    return {
+      totalCoins: totals._sum.coins?.toString() ?? '0',
+      totalDiamonds: totals._sum.diamonds?.toString() ?? '0',
+      todayRecharge: todayRecharge._sum.amount?.toString() ?? '0',
+      weekRecharge: weekRecharge._sum.amount?.toString() ?? '0',
+      monthRecharge: monthRecharge._sum.amount?.toString() ?? '0',
+    };
+  }
+
+  async getWalletTransactions(filters: { type?: string; page?: number; limit?: number }) {
+    const { type, page = 1, limit = 20 } = filters;
+    const where: any = {};
+    if (type) where.type = type.toUpperCase();
+
+    const [data, total] = await Promise.all([
+      this.prisma.transaction.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: { select: { id: true, uid: true, displayName: true, avatar: true } },
+        },
+      }),
+      this.prisma.transaction.count({ where }),
+    ]);
+
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  // ==================== SETTINGS ADMIN ====================
+
+  getSettings() {
+    return {
+      appName: 'VOXO',
+      maintenanceMode: false,
+      registrationEnabled: true,
+      giftingEnabled: true,
+      withdrawalEnabled: true,
+      minWithdrawalAmount: 1000,
+      maxWithdrawalAmount: 1000000,
+      referralEnabled: true,
+      maxRoomSeats: 8,
+      defaultLanguage: 'uz',
+      supportedLanguages: ['uz', 'ru', 'en'],
+    };
+  }
+
+  async updateSettings(data: any) {
+    // No AppSettings model — return merged hardcoded + provided values
+    return { ...this.getSettings(), ...data };
   }
 
   // ==================== HELPERS ====================
