@@ -1,51 +1,33 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createColumnHelper } from '@tanstack/react-table'
 import {
   PlusIcon,
-  EyeIcon,
   PencilSquareIcon,
   CalendarIcon,
-  UsersIcon,
-  BoltIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline'
 import DataTable from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
 import FormField from '@/components/ui/FormField'
+import Toggle from '@/components/ui/Toggle'
+import { ConfirmModal } from '@/components/ui/Modal'
 import { api } from '@/lib/api'
 import { formatDate, formatNumber } from '@/lib/utils'
 import type { Event, EventType, EventStatus } from '@/types'
 import toast from 'react-hot-toast'
 
-const columnHelper = createColumnHelper<Event>()
+const columnHelper = createColumnHelper<any>()
 
 const eventTypeOptions: { value: EventType; label: string; color: string }[] = [
   { value: 'ranking', label: 'RANKING', color: 'text-amber-400 bg-amber-500/20' },
-  { value: 'spending', label: 'NATIONAL', color: 'text-green-400 bg-green-500/20' },
-  { value: 'gifting', label: 'RAMADAN', color: 'text-purple-400 bg-purple-500/20' },
-  { value: 'room_activity', label: 'NEW_YEAR', color: 'text-blue-400 bg-blue-500/20' },
-  { value: 'custom', label: 'FAMILY_WAR', color: 'text-red-400 bg-red-500/20' },
+  { value: 'spending', label: 'SPENDING', color: 'text-green-400 bg-green-500/20' },
+  { value: 'gifting', label: 'GIFTING', color: 'text-purple-400 bg-purple-500/20' },
+  { value: 'room_activity', label: 'ROOM_ACTIVITY', color: 'text-blue-400 bg-blue-500/20' },
+  { value: 'custom', label: 'CUSTOM', color: 'text-red-400 bg-red-500/20' },
 ]
-
-const mockEvents: Event[] = Array.from({ length: 20 }, (_, i) => ({
-  id: `event-${i}`,
-  name: ['Ramadan Challenge 2024', 'New Year Gala', 'National Day Celebration', 'Family War Season 3', 'Diamond Hunt', 'Star Gift Festival', 'Summer Splash', 'Golden Week'][i % 8],
-  description: 'Join this exciting event and compete with top users worldwide for amazing prizes!',
-  coverImage: `https://picsum.photos/600/300?random=${i + 200}`,
-  type: (['ranking', 'spending', 'gifting', 'room_activity', 'custom'] as const)[i % 5],
-  status: (['active', 'active', 'ended', 'draft', 'active'] as const)[i % 5] as EventStatus,
-  startDate: new Date(Date.now() - Math.random() * 86400000 * 3).toISOString(),
-  endDate: new Date(Date.now() + Math.random() * 86400000 * 10).toISOString(),
-  participantsCount: Math.floor(Math.random() * 5000) + 100,
-  prizes: [
-    { rank: 1, reward: 'Diamond Frame + 50,000 coins', value: 50000 },
-    { rank: 2, reward: 'Gold Frame + 25,000 coins', value: 25000 },
-    { rank: 3, reward: 'Silver Frame + 10,000 coins', value: 10000 },
-  ],
-  createdAt: new Date(Date.now() - Math.random() * 86400000 * 30).toISOString(),
-}))
 
 interface EventForm {
   name: string
@@ -54,6 +36,7 @@ interface EventForm {
   startDate: string
   endDate: string
   coverImage: string
+  isActive: boolean
   rewards: string
 }
 
@@ -64,6 +47,7 @@ const emptyForm: EventForm = {
   startDate: '',
   endDate: '',
   coverImage: '',
+  isActive: true,
   rewards: JSON.stringify([
     { rank: 1, reward: 'First prize', value: 50000 },
     { rank: 2, reward: 'Second prize', value: 25000 },
@@ -71,18 +55,37 @@ const emptyForm: EventForm = {
 }
 
 export default function EventsPage() {
+  const [events, setEvents] = useState<any[]>([])
+  const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
-  const [loading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [editTarget, setEditTarget] = useState<Event | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+  const [editTarget, setEditTarget] = useState<any | null>(null)
   const [form, setForm] = useState<EventForm>(emptyForm)
   const [errors, setErrors] = useState<Partial<EventForm>>({})
   const [saving, setSaving] = useState(false)
   const [rewardsError, setRewardsError] = useState('')
 
-  const activeEvents = mockEvents.filter(e => e.status === 'active').length
-  const totalParticipants = mockEvents.reduce((s, e) => s + e.participantsCount, 0)
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await api.getEvents({ page, limit: pageSize })
+      setEvents((res as any).data ?? [])
+      setTotal((res as any).total ?? 0)
+    } catch {
+      setError('Failed to load events')
+    } finally {
+      setLoading(false)
+    }
+  }, [page, pageSize])
+
+  useEffect(() => { load() }, [load])
+
+  const activeEvents = events.filter(e => e.status === 'active' || e.isActive).length
 
   const openCreate = () => {
     setEditTarget(null)
@@ -92,16 +95,17 @@ export default function EventsPage() {
     setDrawerOpen(true)
   }
 
-  const openEdit = (event: Event) => {
+  const openEdit = (event: any) => {
     setEditTarget(event)
     setForm({
       name: event.name,
       description: event.description || '',
-      type: event.type,
-      startDate: event.startDate.split('T')[0],
-      endDate: event.endDate.split('T')[0],
+      type: event.type || 'ranking',
+      startDate: event.startDate ? event.startDate.split('T')[0] : '',
+      endDate: event.endDate ? event.endDate.split('T')[0] : '',
       coverImage: event.coverImage || '',
-      rewards: JSON.stringify(event.prizes || [], null, 2),
+      isActive: event.isActive ?? (event.status === 'active'),
+      rewards: JSON.stringify(event.prizes || event.rewards || [], null, 2),
     })
     setErrors({})
     setRewardsError('')
@@ -118,31 +122,36 @@ export default function EventsPage() {
     if (!form.name.trim()) e.name = 'Name is required'
     if (!form.startDate) e.startDate = 'Start date is required'
     if (!form.endDate) e.endDate = 'End date is required'
-    try { JSON.parse(form.rewards) } catch { setRewardsError('Invalid JSON format') }
+    let rwErr = ''
+    try { JSON.parse(form.rewards) } catch { rwErr = 'Invalid JSON format' }
+    setRewardsError(rwErr)
     setErrors(e)
-    return Object.keys(e).length === 0 && !rewardsError
+    return Object.keys(e).length === 0 && !rwErr
   }
 
   const handleSave = async () => {
     if (!validate()) return
     setSaving(true)
     try {
-      const fd = new FormData()
-      fd.append('name', form.name)
-      fd.append('description', form.description)
-      fd.append('type', form.type)
-      fd.append('startDate', form.startDate)
-      fd.append('endDate', form.endDate)
-      fd.append('coverImage', form.coverImage)
-      fd.append('prizes', form.rewards)
+      const data: Record<string, any> = {
+        name: form.name,
+        description: form.description,
+        type: form.type,
+        startDate: form.startDate,
+        endDate: form.endDate,
+        coverImage: form.coverImage || undefined,
+        isActive: form.isActive,
+        prizes: JSON.parse(form.rewards),
+      }
       if (editTarget) {
-        await api.updateEvent(editTarget.id, fd)
+        await api.updateEvent(editTarget.id, data)
         toast.success('Event updated')
       } else {
-        await api.createEvent(fd)
+        await api.createEvent(data as any)
         toast.success('Event created')
       }
       setDrawerOpen(false)
+      load()
     } catch {
       toast.error('Failed to save event')
     } finally {
@@ -150,13 +159,21 @@ export default function EventsPage() {
     }
   }
 
-  const paginated = mockEvents.slice((page - 1) * pageSize, page * pageSize)
+  const handleDelete = async (event: any) => {
+    try {
+      // No deleteEvent in API yet — show handled gracefully
+      toast.error('Delete not supported via API')
+      setDeleteTarget(null)
+    } catch {
+      toast.error('Failed to delete event')
+    }
+  }
 
   const columns = [
     columnHelper.accessor('coverImage', {
       header: 'Banner',
       size: 100,
-      cell: (info) => (
+      cell: (info: any) => (
         <div className="w-16 h-10 rounded-lg overflow-hidden bg-white/5 border border-white/10">
           {info.getValue() ? (
             <img src={info.getValue()} alt="" className="w-full h-full object-cover" />
@@ -171,16 +188,16 @@ export default function EventsPage() {
     columnHelper.accessor('name', {
       header: 'Name',
       size: 200,
-      cell: (info) => <span className="text-white text-sm font-medium">{info.getValue()}</span>,
+      cell: (info: any) => <span className="text-white text-sm font-medium">{info.getValue()}</span>,
     }),
     columnHelper.accessor('type', {
       header: 'Type',
-      size: 130,
-      cell: (info) => {
+      size: 140,
+      cell: (info: any) => {
         const opt = eventTypeOptions.find(o => o.value === info.getValue())
         return (
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${opt?.color || 'text-[#737373] bg-white/5'}`}>
-            {opt?.label || info.getValue()}
+            {opt?.label || info.getValue() || '—'}
           </span>
         )
       },
@@ -188,30 +205,31 @@ export default function EventsPage() {
     columnHelper.accessor('startDate', {
       header: 'Start',
       size: 110,
-      cell: (info) => <span className="text-[#A0A0B0] text-sm">{formatDate(info.getValue())}</span>,
+      cell: (info: any) => <span className="text-[#A0A0B0] text-sm">{info.getValue() ? formatDate(info.getValue()) : '—'}</span>,
     }),
     columnHelper.accessor('endDate', {
       header: 'End',
       size: 110,
-      cell: (info) => <span className="text-[#A0A0B0] text-sm">{formatDate(info.getValue())}</span>,
+      cell: (info: any) => <span className="text-[#A0A0B0] text-sm">{info.getValue() ? formatDate(info.getValue()) : '—'}</span>,
     }),
-    columnHelper.accessor('participantsCount', {
-      header: 'Participants',
-      size: 120,
-      cell: (info) => (
-        <span className="text-white text-sm font-medium">{formatNumber(info.getValue())}</span>
-      ),
-    }),
-    columnHelper.accessor('status', {
-      header: 'Status',
-      size: 100,
-      cell: (info) => <Badge status={info.getValue()} size="sm" />,
+    columnHelper.accessor('isActive', {
+      header: 'Active',
+      size: 80,
+      cell: (info: any) => {
+        const event = info.row.original
+        const active = info.getValue() ?? (event.status === 'active')
+        return (
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${active ? 'text-green-400 bg-green-500/20' : 'text-[#737373] bg-white/5'}`}>
+            {active ? 'Active' : 'Inactive'}
+          </span>
+        )
+      },
     }),
     columnHelper.display({
       id: 'actions',
       header: 'Actions',
-      size: 90,
-      cell: ({ row }) => {
+      size: 80,
+      cell: ({ row }: any) => {
         const event = row.original
         return (
           <div className="flex items-center gap-1">
@@ -228,15 +246,26 @@ export default function EventsPage() {
     }),
   ]
 
+  if (error) {
+    return (
+      <div className="card text-center py-12 space-y-3">
+        <p className="text-red-400">{error}</p>
+        <button onClick={load} className="btn-secondary inline-flex items-center gap-2">
+          <ArrowPathIcon className="w-4 h-4" />
+          Retry
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {[
           { label: 'Active Events', value: activeEvents, color: 'text-green-400' },
-          { label: 'Total Events', value: mockEvents.length, color: 'text-white' },
-          { label: 'Total Participants', value: formatNumber(totalParticipants), color: 'text-blue-400' },
-          { label: 'Draft', value: mockEvents.filter(e => e.status === 'draft').length, color: 'text-yellow-400' },
+          { label: 'Total Events', value: total, color: 'text-white' },
+          { label: 'Loaded', value: events.length, color: 'text-blue-400' },
         ].map((stat) => (
           <div key={stat.label} className="card py-4 text-center">
             <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
@@ -255,10 +284,10 @@ export default function EventsPage() {
           </button>
         </div>
         <DataTable
-          data={paginated}
+          data={events}
           columns={columns}
           loading={loading}
-          total={mockEvents.length}
+          total={total}
           page={page}
           pageSize={pageSize}
           onPageChange={setPage}
@@ -345,6 +374,10 @@ export default function EventsPage() {
               />
               {rewardsError && <p className="text-red-400 text-xs mt-1">{rewardsError}</p>}
             </FormField>
+
+            <div className="sm:col-span-2">
+              <Toggle checked={form.isActive} onChange={(val) => setField('isActive', val)} label="Active" />
+            </div>
           </div>
         </div>
 

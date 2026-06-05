@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createColumnHelper } from '@tanstack/react-table'
 import {
   MagnifyingGlassIcon,
@@ -8,78 +8,72 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   BuildingOfficeIcon,
-  CurrencyDollarIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline'
 import DataTable from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
 import Avatar from '@/components/ui/Avatar'
 import Modal from '@/components/ui/Modal'
+import FormField from '@/components/ui/FormField'
+import { ConfirmModal } from '@/components/ui/Modal'
 import { api } from '@/lib/api'
 import { formatNumber, formatDate } from '@/lib/utils'
-import type { Agency } from '@/types'
 import toast from 'react-hot-toast'
 
-const columnHelper = createColumnHelper<Agency>()
-
-const mockAgencies: Agency[] = Array.from({ length: 40 }, (_, i) => ({
-  id: `agency-${i}`,
-  name: ['StarLight Agency', 'Nova Talents', 'Apex Stars', 'Golden Voice', 'Elite Creators', 'Horizon Media', 'Pulse Agency', 'Crown Talents'][i % 8] + (i >= 8 ? ` ${Math.floor(i / 8) + 1}` : ''),
-  ownerId: `user-${i % 15}`,
-  owner: {
-    id: `user-${i % 15}`,
-    uid: `U${20000 + i}`,
-    username: `agent${i % 15}`,
-    displayName: `Agent ${i % 15}`,
-    avatar: undefined,
-    level: 40 + (i % 30),
-    vipLevel: Math.min((i % 8) as 0|1|2|3|4|5|6|7|8|9|10, 10) as 0|1|2|3|4|5|6|7|8|9|10,
-    exp: 0,
-    coins: 0,
-    diamonds: 0,
-    status: 'active' as const,
-    isOnline: i % 4 === 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    totalRecharged: 0,
-    totalWithdrawn: 0,
-    followersCount: 0,
-    followingCount: 0,
-    totalGiftsSent: 0,
-    totalGiftsReceived: 0,
-  },
-  talentsCount: Math.floor(Math.random() * 50) + 5,
-  totalWithdrawn: Math.floor(Math.random() * 1000000) + 10000,
-  totalRevenue: Math.floor(Math.random() * 2000000) + 50000,
-  commissionRate: [5, 8, 10, 12, 15][i % 5],
-  status: (['active', 'active', 'active', 'pending', 'banned'] as const)[i % 5],
-  createdAt: new Date(Date.now() - Math.random() * 86400000 * 400).toISOString(),
-  region: ['US', 'UK', 'AE', 'SA', 'EG', 'TR'][i % 6],
-}))
+const columnHelper = createColumnHelper<any>()
 
 export default function AgenciesPage() {
+  const [agencies, setAgencies] = useState<any[]>([])
+  const [total, setTotal] = useState(0)
   const [search, setSearch] = useState('')
   const [searchInput, setSearchInput] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
-  const [loading] = useState(false)
-  const [viewTarget, setViewTarget] = useState<Agency | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [viewTarget, setViewTarget] = useState<any | null>(null)
+  const [rejectTarget, setRejectTarget] = useState<any | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const filtered = mockAgencies.filter((a) => {
-    const matchSearch = !search || a.name.toLowerCase().includes(search.toLowerCase())
-    const matchStatus = !statusFilter || a.status === statusFilter
-    return matchSearch && matchStatus
-  })
-  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await api.getAgencies({
+        search: search || undefined,
+        status: statusFilter || undefined,
+        page,
+        limit: pageSize,
+      })
+      setAgencies((res as any).data ?? [])
+      setTotal((res as any).total ?? 0)
+    } catch {
+      setError('Failed to load agencies')
+    } finally {
+      setLoading(false)
+    }
+  }, [search, statusFilter, page, pageSize])
 
-  const totalRevenue = mockAgencies.reduce((s, a) => s + a.totalRevenue, 0)
+  useEffect(() => { load() }, [load])
 
-  const handleApprove = async (agency: Agency) => {
+  const handleSearchInput = (val: string) => {
+    setSearchInput(val)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      setSearch(val)
+      setPage(1)
+    }, 400)
+  }
+
+  const handleApprove = async (agency: any) => {
     setActionLoading(true)
     try {
       await api.approveAgency(agency.id)
       toast.success(`Agency "${agency.name}" approved`)
+      load()
     } catch {
       toast.error('Failed to approve agency')
     } finally {
@@ -87,11 +81,15 @@ export default function AgenciesPage() {
     }
   }
 
-  const handleReject = async (agency: Agency) => {
+  const handleReject = async () => {
+    if (!rejectTarget) return
     setActionLoading(true)
     try {
-      await api.rejectAgency(agency.id, 'Does not meet requirements')
-      toast.success(`Agency "${agency.name}" rejected`)
+      await api.rejectAgency(rejectTarget.id, rejectReason || 'Does not meet requirements')
+      toast.success(`Agency "${rejectTarget.name}" rejected`)
+      setRejectTarget(null)
+      setRejectReason('')
+      load()
     } catch {
       toast.error('Failed to reject agency')
     } finally {
@@ -99,11 +97,14 @@ export default function AgenciesPage() {
     }
   }
 
+  const activeCount = agencies.filter(a => a.status === 'active').length
+  const pendingCount = agencies.filter(a => a.status === 'pending').length
+
   const columns = [
     columnHelper.accessor('name', {
       header: 'Agency',
       size: 220,
-      cell: (info) => {
+      cell: (info: any) => {
         const agency = info.row.original
         return (
           <div className="flex items-center gap-3">
@@ -112,7 +113,7 @@ export default function AgenciesPage() {
             </div>
             <div>
               <p className="text-white text-sm font-medium">{agency.name}</p>
-              <p className="text-[#737373] text-xs">{agency.region}</p>
+              {agency.region && <p className="text-[#737373] text-xs">{agency.region}</p>}
             </div>
           </div>
         )
@@ -121,47 +122,58 @@ export default function AgenciesPage() {
     columnHelper.accessor('owner', {
       header: 'Owner',
       size: 160,
-      cell: (info) => {
-        const owner = info.getValue() as (typeof info.row.original)['owner']
+      cell: (info: any) => {
+        const owner = info.getValue()
+        const displayName = owner?.displayName ?? owner?.username ?? '—'
         return (
           <div className="flex items-center gap-2">
-            <Avatar src={owner?.avatar} name={owner?.displayName || 'Owner'} size="xs" online={owner?.isOnline} />
-            <span className="text-[#C0C0D0] text-sm">{owner?.displayName}</span>
+            <Avatar src={owner?.avatar} name={displayName} size="xs" />
+            <span className="text-[#C0C0D0] text-sm">{displayName}</span>
           </div>
         )
       },
     }),
-    columnHelper.accessor('talentsCount', {
-      header: 'Talents',
+    columnHelper.display({
+      id: 'members',
+      header: 'Members',
       size: 90,
-      cell: (info) => (
-        <span className="text-white text-sm font-medium">{info.getValue()}</span>
-      ),
+      cell: ({ row }: any) => {
+        const agency = row.original
+        const count = agency.talentsCount ?? agency.memberCount ?? agency._count?.members ?? '—'
+        return <span className="text-white text-sm font-medium">{count}</span>
+      },
     }),
-    columnHelper.accessor('commissionRate', {
-      header: 'Commission %',
-      size: 120,
-      cell: (info) => (
-        <span className="text-amber-400 font-medium text-sm">{info.getValue()}%</span>
-      ),
-    }),
-    columnHelper.accessor('totalRevenue', {
-      header: 'Total Earnings',
-      size: 130,
-      cell: (info) => (
-        <span className="text-green-400 text-sm font-medium">{formatNumber(info.getValue())} 💎</span>
-      ),
+    columnHelper.display({
+      id: 'verified',
+      header: 'Verified',
+      size: 90,
+      cell: ({ row }: any) => {
+        const agency = row.original
+        const isVerified = agency.isVerified ?? agency.status === 'active'
+        return (
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${isVerified ? 'text-green-400 bg-green-500/20' : 'text-[#737373] bg-white/5'}`}>
+            {isVerified ? 'Verified' : 'Unverified'}
+          </span>
+        )
+      },
     }),
     columnHelper.accessor('status', {
       header: 'Status',
       size: 110,
-      cell: (info) => <Badge status={info.getValue()} size="sm" />,
+      cell: (info: any) => <Badge status={info.getValue() ?? 'pending'} size="sm" />,
+    }),
+    columnHelper.accessor('createdAt', {
+      header: 'Created',
+      size: 120,
+      cell: (info: any) => (
+        <span className="text-[#737373] text-sm">{info.getValue() ? formatDate(info.getValue()) : '—'}</span>
+      ),
     }),
     columnHelper.display({
       id: 'actions',
       header: 'Actions',
       size: 130,
-      cell: ({ row }) => {
+      cell: ({ row }: any) => {
         const agency = row.original
         return (
           <div className="flex items-center gap-1">
@@ -183,7 +195,7 @@ export default function AgenciesPage() {
                   <CheckCircleIcon className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => handleReject(agency)}
+                  onClick={() => { setRejectTarget(agency); setRejectReason('') }}
                   disabled={actionLoading}
                   className="p-1.5 rounded-lg text-[#737373] hover:text-red-400 hover:bg-red-500/10 transition-all"
                   title="Reject"
@@ -198,15 +210,26 @@ export default function AgenciesPage() {
     }),
   ]
 
+  if (error) {
+    return (
+      <div className="card text-center py-12 space-y-3">
+        <p className="text-red-400">{error}</p>
+        <button onClick={load} className="btn-secondary inline-flex items-center gap-2">
+          <ArrowPathIcon className="w-4 h-4" />
+          Retry
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {[
-          { label: 'Total Agencies', value: mockAgencies.length, color: 'text-white' },
-          { label: 'Active', value: mockAgencies.filter(a => a.status === 'active').length, color: 'text-green-400' },
-          { label: 'Pending Approval', value: mockAgencies.filter(a => a.status === 'pending').length, color: 'text-yellow-400' },
-          { label: 'Total Revenue', value: `${formatNumber(totalRevenue)} 💎`, color: 'text-purple-400' },
+          { label: 'Total Agencies', value: total, color: 'text-white' },
+          { label: 'Active', value: activeCount, color: 'text-green-400' },
+          { label: 'Pending Approval', value: pendingCount, color: 'text-yellow-400' },
         ].map((stat) => (
           <div key={stat.label} className="card py-4 text-center">
             <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
@@ -218,19 +241,16 @@ export default function AgenciesPage() {
       {/* Toolbar + Table */}
       <div className="card p-0 overflow-hidden">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-5 border-b border-white/5">
-          <form
-            onSubmit={(e) => { e.preventDefault(); setSearch(searchInput); setPage(1) }}
-            className="flex-1 relative max-w-sm"
-          >
+          <div className="flex-1 relative max-w-sm">
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#737373]" />
             <input
               type="text"
               placeholder="Search agencies..."
               value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
+              onChange={(e) => handleSearchInput(e.target.value)}
               className="input pl-10"
             />
-          </form>
+          </div>
           <select
             value={statusFilter}
             onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
@@ -243,10 +263,10 @@ export default function AgenciesPage() {
           </select>
         </div>
         <DataTable
-          data={paginated}
+          data={agencies}
           columns={columns}
           loading={loading}
-          total={filtered.length}
+          total={total}
           page={page}
           pageSize={pageSize}
           onPageChange={setPage}
@@ -266,24 +286,49 @@ export default function AgenciesPage() {
               </div>
               <div>
                 <h4 className="text-white text-xl font-bold">{viewTarget.name}</h4>
-                <p className="text-[#737373]">Region: {viewTarget.region}</p>
+                {viewTarget.region && <p className="text-[#737373]">Region: {viewTarget.region}</p>}
               </div>
-              <Badge status={viewTarget.status} className="ml-auto" />
+              <Badge status={viewTarget.status ?? 'pending'} className="ml-auto" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               {[
-                { label: 'Owner', value: viewTarget.owner?.displayName || '—' },
-                { label: 'Talents', value: viewTarget.talentsCount },
-                { label: 'Commission Rate', value: `${viewTarget.commissionRate}%` },
-                { label: 'Total Revenue', value: `${formatNumber(viewTarget.totalRevenue)} 💎` },
-                { label: 'Total Withdrawn', value: `${formatNumber(viewTarget.totalWithdrawn)} 💎` },
-                { label: 'Created', value: formatDate(viewTarget.createdAt) },
+                { label: 'Owner', value: viewTarget.owner?.displayName ?? viewTarget.owner?.username ?? '—' },
+                { label: 'Members', value: viewTarget.talentsCount ?? viewTarget.memberCount ?? viewTarget._count?.members ?? '—' },
+                { label: 'Commission Rate', value: viewTarget.commissionRate != null ? `${viewTarget.commissionRate}%` : '—' },
+                { label: 'Total Revenue', value: viewTarget.totalRevenue != null ? `${formatNumber(viewTarget.totalRevenue)} 💎` : '—' },
+                { label: 'Total Withdrawn', value: viewTarget.totalWithdrawn != null ? `${formatNumber(viewTarget.totalWithdrawn)} 💎` : '—' },
+                { label: 'Created', value: viewTarget.createdAt ? formatDate(viewTarget.createdAt) : '—' },
               ].map((item) => (
                 <div key={item.label} className="bg-white/3 rounded-xl p-3">
                   <p className="text-[#737373] text-xs mb-1">{item.label}</p>
-                  <p className="text-white text-sm font-medium">{item.value}</p>
+                  <p className="text-white text-sm font-medium">{String(item.value)}</p>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Reject Modal */}
+      <Modal open={!!rejectTarget} onClose={() => setRejectTarget(null)} title="Reject Agency" size="sm">
+        {rejectTarget && (
+          <div className="space-y-4">
+            <p className="text-[#A0A0B0] text-sm">Reject <span className="text-white font-medium">"{rejectTarget.name}"</span>?</p>
+            <FormField label="Reason">
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                rows={3}
+                className="input resize-none"
+                placeholder="Reason for rejection..."
+              />
+            </FormField>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setRejectTarget(null)} className="btn-secondary" disabled={actionLoading}>Cancel</button>
+              <button onClick={handleReject} className="btn-danger" disabled={actionLoading}>
+                {actionLoading && <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />}
+                Reject
+              </button>
             </div>
           </div>
         )}

@@ -1,110 +1,132 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createColumnHelper } from '@tanstack/react-table'
 import {
   MagnifyingGlassIcon,
   EyeIcon,
   NoSymbolIcon,
-  UserGroupIcon,
-  CalendarDaysIcon,
+  CheckCircleIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline'
 import DataTable from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
 import Avatar from '@/components/ui/Avatar'
 import Modal from '@/components/ui/Modal'
+import FormField from '@/components/ui/FormField'
 import { ConfirmModal } from '@/components/ui/Modal'
 import { api } from '@/lib/api'
-import { formatNumber, formatDate, timeAgo } from '@/lib/utils'
-import type { Family } from '@/types'
+import { formatNumber, formatDate } from '@/lib/utils'
 import toast from 'react-hot-toast'
 
-const columnHelper = createColumnHelper<Family>()
-
-const mockFamilies: Family[] = Array.from({ length: 50 }, (_, i) => ({
-  id: `family-${i}`,
-  name: ['Phoenix Warriors', 'Dragon Squad', 'Night Owls', 'Golden Stars', 'Silver Wolves', 'Crystal Hearts', 'Shadow Hunters', 'Rainbow Elite', 'Iron Fists', 'Sky Kings'][i % 10] + (i >= 10 ? ` ${Math.floor(i / 10) + 1}` : ''),
-  tag: ['PW', 'DS', 'NO', 'GS', 'SW', 'CH', 'SH', 'RE', 'IF', 'SK'][i % 10],
-  ownerId: `user-${i % 20}`,
-  owner: {
-    id: `user-${i % 20}`,
-    uid: `U${10000 + i}`,
-    username: `owner${i % 20}`,
-    displayName: `Owner ${i % 20}`,
-    avatar: undefined,
-    level: 30 + (i % 40),
-    vipLevel: (i % 6) as 0 | 1 | 2 | 3 | 4 | 5,
-    exp: 0,
-    coins: 0,
-    diamonds: 0,
-    status: 'active' as const,
-    isOnline: i % 3 === 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    totalRecharged: 0,
-    totalWithdrawn: 0,
-    followersCount: 0,
-    followingCount: 0,
-    totalGiftsSent: 0,
-    totalGiftsReceived: 0,
-  },
-  level: Math.floor(Math.random() * 20) + 1,
-  exp: Math.floor(Math.random() * 100000),
-  membersCount: Math.floor(Math.random() * 90) + 10,
-  maxMembers: 100,
-  totalGiftsReceived: Math.floor(Math.random() * 500000) + 10000,
-  isPublic: i % 4 !== 3,
-  status: i % 8 === 7 ? 'banned' : 'active',
-  createdAt: new Date(Date.now() - Math.random() * 86400000 * 365).toISOString(),
-  region: ['US', 'UK', 'AE', 'SA', 'EG'][i % 5],
-}))
+const columnHelper = createColumnHelper<any>()
 
 export default function FamiliesPage() {
+  const [families, setFamilies] = useState<any[]>([])
+  const [total, setTotal] = useState(0)
   const [search, setSearch] = useState('')
   const [searchInput, setSearchInput] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
-  const [loading] = useState(false)
-  const [viewTarget, setViewTarget] = useState<Family | null>(null)
-  const [disbandTarget, setDisbandTarget] = useState<Family | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [viewTarget, setViewTarget] = useState<any | null>(null)
+  const [viewDetail, setViewDetail] = useState<any | null>(null)
+  const [viewLoading, setViewLoading] = useState(false)
+  const [banTarget, setBanTarget] = useState<any | null>(null)
+  const [unbanTarget, setUnbanTarget] = useState<any | null>(null)
+  const [banReason, setBanReason] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const filtered = mockFamilies.filter((f) =>
-    !search || f.name.toLowerCase().includes(search.toLowerCase()) || f.tag.toLowerCase().includes(search.toLowerCase())
-  )
-  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await api.getFamilies({ search: search || undefined, page, limit: pageSize })
+      setFamilies((res as any).data ?? [])
+      setTotal((res as any).total ?? 0)
+    } catch {
+      setError('Failed to load families')
+    } finally {
+      setLoading(false)
+    }
+  }, [search, page, pageSize])
 
-  const newThisWeek = mockFamilies.filter(
-    (f) => new Date(f.createdAt) > new Date(Date.now() - 7 * 86400000)
-  ).length
+  useEffect(() => { load() }, [load])
 
-  const handleDisband = async (family: Family) => {
+  const handleSearchInput = (val: string) => {
+    setSearchInput(val)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      setSearch(val)
+      setPage(1)
+    }, 400)
+  }
+
+  const handleViewFamily = async (family: any) => {
+    setViewTarget(family)
+    setViewDetail(null)
+    setViewLoading(true)
+    try {
+      const detail = await api.getFamily(family.id)
+      setViewDetail(detail)
+    } catch {
+      setViewDetail(family)
+    } finally {
+      setViewLoading(false)
+    }
+  }
+
+  const handleBan = async () => {
+    if (!banTarget) return
     setActionLoading(true)
     try {
-      await api.banFamily(family.id, 'Disbanded by admin')
-      toast.success(`Family "${family.name}" has been disbanded`)
-      setDisbandTarget(null)
+      await api.banFamily(banTarget.id, banReason || 'Banned by admin')
+      toast.success(`Family "${banTarget.name}" has been banned`)
+      setBanTarget(null)
+      setBanReason('')
+      load()
     } catch {
-      toast.error('Failed to disband family')
+      toast.error('Failed to ban family')
     } finally {
       setActionLoading(false)
     }
   }
 
+  const handleUnban = async () => {
+    if (!unbanTarget) return
+    setActionLoading(true)
+    try {
+      await api.unbanFamily(unbanTarget.id)
+      toast.success(`Family "${unbanTarget.name}" has been unbanned`)
+      setUnbanTarget(null)
+      load()
+    } catch {
+      toast.error('Failed to unban family')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const activeCount = families.filter(f => f.status === 'active').length
+  const bannedCount = families.filter(f => f.status === 'banned').length
+
   const columns = [
     columnHelper.accessor('name', {
       header: 'Family',
       size: 220,
-      cell: (info) => {
+      cell: (info: any) => {
         const family = info.row.original
+        const tag = family.tag || family.name?.slice(0, 2).toUpperCase() || '??'
         return (
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-[#7C3AED]/20 flex items-center justify-center text-sm font-bold text-[#A78BFA] shrink-0">
-              {family.tag.slice(0, 2)}
+              {tag.slice(0, 2)}
             </div>
             <div>
               <p className="text-white text-sm font-medium">{family.name}</p>
-              <p className="text-[#737373] text-xs">[{family.tag}]</p>
+              {tag && <p className="text-[#737373] text-xs">[{tag}]</p>}
             </div>
           </div>
         )
@@ -113,24 +135,29 @@ export default function FamiliesPage() {
     columnHelper.accessor('owner', {
       header: 'Owner',
       size: 160,
-      cell: (info) => {
-        const owner = info.getValue()
+      cell: (info: any) => {
+        const family = info.row.original
+        const owner = info.getValue() ?? family.user
+        const displayName = owner?.displayName ?? owner?.username ?? '—'
         return (
           <div className="flex items-center gap-2">
-            <Avatar src={owner?.avatar} name={owner?.displayName || 'Owner'} size="xs" online={owner?.isOnline} />
-            <span className="text-[#C0C0D0] text-sm">{owner?.displayName}</span>
+            <Avatar src={owner?.avatar} name={displayName} size="xs" />
+            <span className="text-[#C0C0D0] text-sm">{displayName}</span>
           </div>
         )
       },
     }),
-    columnHelper.accessor('membersCount', {
+    columnHelper.display({
+      id: 'members',
       header: 'Members',
       size: 100,
-      cell: (info) => {
-        const family = info.row.original
+      cell: ({ row }: any) => {
+        const family = row.original
+        const count = family.membersCount ?? family._count?.members ?? family.memberCount ?? '—'
+        const max = family.maxMembers ?? '—'
         return (
           <span className="text-white text-sm">
-            {info.getValue()}<span className="text-[#737373]">/{family.maxMembers}</span>
+            {count}<span className="text-[#737373]">{max !== '—' ? `/${max}` : ''}</span>
           </span>
         )
       },
@@ -138,51 +165,56 @@ export default function FamiliesPage() {
     columnHelper.accessor('level', {
       header: 'Level',
       size: 80,
-      cell: (info) => (
-        <span className="text-[#A78BFA] font-bold text-sm">Lv.{info.getValue()}</span>
-      ),
-    }),
-    columnHelper.accessor('totalGiftsReceived', {
-      header: 'Treasury',
-      size: 110,
-      cell: (info) => (
-        <span className="text-blue-400 text-sm font-medium">{formatNumber(info.getValue())} 💎</span>
+      cell: (info: any) => (
+        <span className="text-[#A78BFA] font-bold text-sm">Lv.{info.getValue() ?? 1}</span>
       ),
     }),
     columnHelper.accessor('status', {
       header: 'Status',
       size: 100,
-      cell: (info) => <Badge status={info.getValue()} size="sm" />,
+      cell: (info: any) => {
+        const val = info.getValue() ?? 'active'
+        return <Badge status={val} size="sm" />
+      },
     }),
     columnHelper.accessor('createdAt', {
       header: 'Created',
       size: 120,
-      cell: (info) => (
-        <span className="text-[#737373] text-sm">{formatDate(info.getValue())}</span>
+      cell: (info: any) => (
+        <span className="text-[#737373] text-sm">{info.getValue() ? formatDate(info.getValue()) : '—'}</span>
       ),
     }),
     columnHelper.display({
       id: 'actions',
       header: 'Actions',
       size: 100,
-      cell: ({ row }) => {
+      cell: ({ row }: any) => {
         const family = row.original
+        const isBanned = family.status === 'banned'
         return (
           <div className="flex items-center gap-1">
             <button
-              onClick={() => setViewTarget(family)}
+              onClick={() => handleViewFamily(family)}
               className="p-1.5 rounded-lg text-[#737373] hover:text-white hover:bg-white/5 transition-all"
               title="View"
             >
               <EyeIcon className="w-4 h-4" />
             </button>
-            {family.status === 'active' && (
+            {!isBanned ? (
               <button
-                onClick={() => setDisbandTarget(family)}
+                onClick={() => { setBanTarget(family); setBanReason('') }}
                 className="p-1.5 rounded-lg text-[#737373] hover:text-red-400 hover:bg-red-500/10 transition-all"
-                title="Disband"
+                title="Ban"
               >
                 <NoSymbolIcon className="w-4 h-4" />
+              </button>
+            ) : (
+              <button
+                onClick={() => setUnbanTarget(family)}
+                className="p-1.5 rounded-lg text-[#737373] hover:text-green-400 hover:bg-green-500/10 transition-all"
+                title="Unban"
+              >
+                <CheckCircleIcon className="w-4 h-4" />
               </button>
             )}
           </div>
@@ -191,15 +223,26 @@ export default function FamiliesPage() {
     }),
   ]
 
+  if (error) {
+    return (
+      <div className="card text-center py-12 space-y-3">
+        <p className="text-red-400">{error}</p>
+        <button onClick={load} className="btn-secondary inline-flex items-center gap-2">
+          <ArrowPathIcon className="w-4 h-4" />
+          Retry
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {[
-          { label: 'Total Families', value: mockFamilies.length, color: 'text-white' },
-          { label: 'Active', value: mockFamilies.filter(f => f.status === 'active').length, color: 'text-green-400' },
-          { label: 'New This Week', value: newThisWeek, color: 'text-blue-400' },
-          { label: 'Banned', value: mockFamilies.filter(f => f.status === 'banned').length, color: 'text-red-400' },
+          { label: 'Total Families', value: total, color: 'text-white' },
+          { label: 'Active', value: activeCount, color: 'text-green-400' },
+          { label: 'Banned', value: bannedCount, color: 'text-red-400' },
         ].map((stat) => (
           <div key={stat.label} className="card py-4 text-center">
             <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
@@ -211,26 +254,23 @@ export default function FamiliesPage() {
       {/* Search + Table */}
       <div className="card p-0 overflow-hidden">
         <div className="flex items-center gap-4 p-5 border-b border-white/5">
-          <form
-            onSubmit={(e) => { e.preventDefault(); setSearch(searchInput); setPage(1) }}
-            className="flex-1 relative max-w-sm"
-          >
+          <div className="flex-1 relative max-w-sm">
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#737373]" />
             <input
               type="text"
-              placeholder="Search by name or tag..."
+              placeholder="Search by name..."
               value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
+              onChange={(e) => handleSearchInput(e.target.value)}
               className="input pl-10"
             />
-          </form>
-          <span className="text-[#737373] text-sm">{filtered.length} families</span>
+          </div>
+          <span className="text-[#737373] text-sm">{total} families</span>
         </div>
         <DataTable
-          data={paginated}
+          data={families}
           columns={columns}
           loading={loading}
-          total={filtered.length}
+          total={total}
           page={page}
           pageSize={pageSize}
           onPageChange={setPage}
@@ -241,47 +281,79 @@ export default function FamiliesPage() {
       </div>
 
       {/* View Modal */}
-      <Modal open={!!viewTarget} onClose={() => setViewTarget(null)} title="Family Details" size="md">
+      <Modal open={!!viewTarget} onClose={() => { setViewTarget(null); setViewDetail(null) }} title="Family Details" size="md">
         {viewTarget && (
           <div className="space-y-5">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-[#7C3AED]/20 flex items-center justify-center text-2xl font-bold text-[#A78BFA]">
-                {viewTarget.tag.slice(0, 2)}
+            {viewLoading ? (
+              <div className="flex justify-center py-8">
+                <div className="w-6 h-6 border-2 border-[#7C3AED] border-t-transparent rounded-full animate-spin" />
               </div>
-              <div>
-                <h4 className="text-white text-xl font-bold">{viewTarget.name}</h4>
-                <p className="text-[#737373]">[{viewTarget.tag}] — Level {viewTarget.level}</p>
-              </div>
-              <Badge status={viewTarget.status} className="ml-auto" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { label: 'Owner', value: viewTarget.owner?.displayName || '—' },
-                { label: 'Members', value: `${viewTarget.membersCount}/${viewTarget.maxMembers}` },
-                { label: 'Treasury', value: `${formatNumber(viewTarget.totalGiftsReceived)} 💎` },
-                { label: 'Region', value: viewTarget.region || '—' },
-                { label: 'Visibility', value: viewTarget.isPublic ? 'Public' : 'Private' },
-                { label: 'Created', value: formatDate(viewTarget.createdAt) },
-              ].map((item) => (
-                <div key={item.label} className="bg-white/3 rounded-xl p-3">
-                  <p className="text-[#737373] text-xs mb-1">{item.label}</p>
-                  <p className="text-white text-sm font-medium">{item.value}</p>
+            ) : (
+              <>
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-2xl bg-[#7C3AED]/20 flex items-center justify-center text-2xl font-bold text-[#A78BFA]">
+                    {((viewDetail ?? viewTarget).tag ?? (viewDetail ?? viewTarget).name ?? '??').slice(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <h4 className="text-white text-xl font-bold">{(viewDetail ?? viewTarget).name}</h4>
+                    <p className="text-[#737373]">Level {(viewDetail ?? viewTarget).level ?? 1}</p>
+                  </div>
+                  <Badge status={(viewDetail ?? viewTarget).status ?? 'active'} className="ml-auto" />
                 </div>
-              ))}
+                <div className="grid grid-cols-2 gap-4">
+                  {[
+                    { label: 'Owner', value: (viewDetail ?? viewTarget).owner?.displayName ?? (viewDetail ?? viewTarget).owner?.username ?? '—' },
+                    { label: 'Members', value: `${(viewDetail ?? viewTarget).membersCount ?? (viewDetail ?? viewTarget)._count?.members ?? '—'}` },
+                    { label: 'Region', value: (viewDetail ?? viewTarget).region || '—' },
+                    { label: 'Visibility', value: (viewDetail ?? viewTarget).isPublic !== false ? 'Public' : 'Private' },
+                    { label: 'Created', value: (viewDetail ?? viewTarget).createdAt ? formatDate((viewDetail ?? viewTarget).createdAt) : '—' },
+                  ].map((item) => (
+                    <div key={item.label} className="bg-white/3 rounded-xl p-3">
+                      <p className="text-[#737373] text-xs mb-1">{item.label}</p>
+                      <p className="text-white text-sm font-medium">{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      {/* Ban Confirm */}
+      <Modal open={!!banTarget} onClose={() => setBanTarget(null)} title="Ban Family" size="sm">
+        {banTarget && (
+          <div className="space-y-4">
+            <p className="text-[#A0A0B0] text-sm">Ban <span className="text-white font-medium">"{banTarget.name}"</span>? All members will lose access.</p>
+            <FormField label="Reason">
+              <textarea
+                value={banReason}
+                onChange={(e) => setBanReason(e.target.value)}
+                rows={3}
+                className="input resize-none"
+                placeholder="Reason for ban..."
+              />
+            </FormField>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setBanTarget(null)} className="btn-secondary" disabled={actionLoading}>Cancel</button>
+              <button onClick={handleBan} className="btn-danger" disabled={actionLoading}>
+                {actionLoading && <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />}
+                Ban Family
+              </button>
             </div>
           </div>
         )}
       </Modal>
 
-      {/* Disband Confirm */}
+      {/* Unban Confirm */}
       <ConfirmModal
-        open={!!disbandTarget}
-        onClose={() => setDisbandTarget(null)}
-        onConfirm={() => disbandTarget && handleDisband(disbandTarget)}
-        title="Disband Family"
-        message={`Are you sure you want to disband "${disbandTarget?.name}"? All members will be removed and this action cannot be undone.`}
-        confirmLabel="Disband"
-        confirmVariant="danger"
+        open={!!unbanTarget}
+        onClose={() => setUnbanTarget(null)}
+        onConfirm={handleUnban}
+        title="Unban Family"
+        message={`Unban "${unbanTarget?.name}"? Members will regain access.`}
+        confirmLabel="Unban"
+        confirmVariant="primary"
         loading={actionLoading}
       />
     </div>

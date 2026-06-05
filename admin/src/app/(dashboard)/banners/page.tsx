@@ -1,17 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   PlusIcon,
   PencilSquareIcon,
   TrashIcon,
   ChevronUpIcon,
   ChevronDownIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline'
 import Modal from '@/components/ui/Modal'
 import FormField from '@/components/ui/FormField'
 import Toggle from '@/components/ui/Toggle'
-import Badge from '@/components/ui/Badge'
 import { ConfirmModal } from '@/components/ui/Modal'
 import { api } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
@@ -31,21 +31,6 @@ const positionColors: Record<string, string> = {
   discovery: 'text-purple-400 bg-purple-500/20',
   loading: 'text-amber-400 bg-amber-500/20',
 }
-
-const mockBanners: Banner[] = Array.from({ length: 8 }, (_, i) => ({
-  id: `banner-${i}`,
-  title: ['Ramadan Special', 'New Year Event', 'VIP Promotion', 'Family War', 'Double Diamonds', 'Gift Festival', 'Summer Vibes', 'National Day'][i],
-  imageUrl: `https://picsum.photos/800/300?random=${i + 100}`,
-  linkUrl: 'https://voxo.app/event',
-  position: (['home_top', 'home_middle', 'discovery', 'loading'] as const)[i % 4],
-  sortOrder: i + 1,
-  isActive: i % 4 !== 3,
-  startDate: new Date(Date.now() - Math.random() * 86400000 * 10).toISOString(),
-  endDate: new Date(Date.now() + Math.random() * 86400000 * 20).toISOString(),
-  clickCount: Math.floor(Math.random() * 50000) + 500,
-  viewCount: Math.floor(Math.random() * 500000) + 5000,
-  createdAt: new Date(Date.now() - Math.random() * 86400000 * 30).toISOString(),
-}))
 
 interface BannerForm {
   title: string
@@ -70,7 +55,9 @@ const emptyForm: BannerForm = {
 }
 
 export default function BannersPage() {
-  const [banners, setBanners] = useState(mockBanners)
+  const [banners, setBanners] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<Banner | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Banner | null>(null)
@@ -78,6 +65,21 @@ export default function BannersPage() {
   const [errors, setErrors] = useState<Partial<BannerForm>>({})
   const [saving, setSaving] = useState(false)
   const [togglingId, setTogglingId] = useState<string | null>(null)
+
+  const load = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await api.getBanners()
+      setBanners(Array.isArray(res?.data ?? res) ? (res?.data ?? res) : [])
+    } catch {
+      setError('Failed to load banners')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { load() }, [])
 
   const setField = <K extends keyof BannerForm>(key: K, val: BannerForm[K]) => {
     setForm(f => ({ ...f, [key]: val }))
@@ -119,7 +121,7 @@ export default function BannersPage() {
     if (!validate()) return
     setSaving(true)
     try {
-      const data: Partial<Banner> = {
+      const data: Record<string, any> = {
         title: form.title,
         imageUrl: form.imageUrl,
         linkUrl: form.linkUrl || undefined,
@@ -131,15 +133,13 @@ export default function BannersPage() {
       }
       if (editTarget) {
         await api.updateBanner(editTarget.id, data)
-        setBanners(prev => prev.map(b => b.id === editTarget.id ? { ...b, ...data } as Banner : b))
         toast.success('Banner updated')
       } else {
-        const fd = new FormData()
-        Object.entries(data).forEach(([k, v]) => v !== undefined && fd.append(k, String(v)))
-        await api.createBanner(fd)
+        await api.createBanner(data as any)
         toast.success('Banner created')
       }
       setModalOpen(false)
+      load()
     } catch {
       toast.error('Failed to save banner')
     } finally {
@@ -184,7 +184,27 @@ export default function BannersPage() {
     api.reorderBanners(newBanners.sort((a, b) => a.sortOrder - b.sortOrder).map(b => b.id)).catch(() => {})
   }
 
-  const sorted = [...banners].sort((a, b) => a.sortOrder - b.sortOrder)
+  const sorted = [...banners].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="w-8 h-8 border-2 border-[#7C3AED] border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="card text-center py-12 space-y-3">
+        <p className="text-red-400">{error}</p>
+        <button onClick={load} className="btn-secondary inline-flex items-center gap-2">
+          <ArrowPathIcon className="w-4 h-4" />
+          Retry
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -221,7 +241,7 @@ export default function BannersPage() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <p className="text-white font-medium truncate">{banner.title}</p>
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${positionColors[banner.position]}`}>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${positionColors[banner.position] || 'text-[#737373] bg-white/5'}`}>
                   {positionOptions.find(p => p.value === banner.position)?.label || banner.position}
                 </span>
               </div>
@@ -229,8 +249,8 @@ export default function BannersPage() {
                 <span>Order: #{banner.sortOrder}</span>
                 {banner.startDate && <span>Starts: {formatDate(banner.startDate)}</span>}
                 {banner.endDate && <span>Ends: {formatDate(banner.endDate)}</span>}
-                <span>{banner.viewCount.toLocaleString()} views</span>
-                <span>{banner.clickCount.toLocaleString()} clicks</span>
+                {banner.viewCount != null && <span>{banner.viewCount.toLocaleString()} views</span>}
+                {banner.clickCount != null && <span>{banner.clickCount.toLocaleString()} clicks</span>}
               </div>
             </div>
 
