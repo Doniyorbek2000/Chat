@@ -1,65 +1,83 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createColumnHelper } from '@tanstack/react-table'
 import {
   MagnifyingGlassIcon,
-  FunnelIcon,
   EyeIcon,
   XCircleIcon,
-  NoSymbolIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline'
 import DataTable from '@/components/ui/DataTable'
 import Avatar from '@/components/ui/Avatar'
 import Badge from '@/components/ui/Badge'
 import { ConfirmModal } from '@/components/ui/Modal'
-import { formatDate, formatNumber, timeAgo } from '@/lib/utils'
+import { api } from '@/lib/api'
+import { formatNumber, timeAgo } from '@/lib/utils'
 import type { Room } from '@/types'
 import toast from 'react-hot-toast'
 
 const columnHelper = createColumnHelper<Room>()
 
-const mockRooms: Room[] = Array.from({ length: 40 }, (_, i) => ({
-  id: `room-${i}`,
-  title: ['Music Lounge', 'Chat Night', 'Game Talk', 'Study Group', 'Comedy Hour', 'News Room', 'Tech Talk', 'Art Corner', 'Sports Zone', 'Fashion Hub'][i % 10] + ` ${i}`,
-  coverImage: undefined,
-  hostId: `user-${i}`,
-  host: { id: `user-${i}`, username: `host${i}`, displayName: `Host ${i}`, uid: `U${1000 + i}`, avatar: undefined, vipLevel: Math.floor(Math.random() * 5) } as never,
-  type: ['public', 'private', 'family'][Math.floor(Math.random() * 3)] as Room['type'],
-  maxSeats: [6, 8, 10, 16][Math.floor(Math.random() * 4)],
-  currentSeats: Math.floor(Math.random() * 8) + 1,
-  totalViewers: Math.floor(Math.random() * 1000) + 10,
-  totalGiftsValue: Math.floor(Math.random() * 100000) + 100,
-  status: i < 25 ? 'live' : 'ended' as Room['status'],
-  isLocked: Math.random() > 0.7,
-  createdAt: new Date(Date.now() - Math.random() * 86400000 * 30).toISOString(),
-  startedAt: new Date(Date.now() - Math.random() * 7200000).toISOString(),
-  onlineCount: Math.floor(Math.random() * 200) + 5,
-  region: ['US', 'EU', 'ME', 'AS'][Math.floor(Math.random() * 4)],
-}))
-
 export default function RoomsPage() {
   const router = useRouter()
+  const [rooms, setRooms] = useState<Room[]>([])
+  const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
+  const [pageSize] = useState(20)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
-  const [showFilters, setShowFilters] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [confirmClose, setConfirmClose] = useState<Room | null>(null)
-  const [confirmBan, setConfirmBan] = useState<Room | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
 
-  const filtered = mockRooms.filter((r) => {
-    const matchSearch = !search || r.title.toLowerCase().includes(search.toLowerCase()) ||
-      r.host?.displayName.toLowerCase().includes(search.toLowerCase())
-    const matchStatus = !statusFilter || r.status === statusFilter
-    const matchType = !typeFilter || r.type === typeFilter
-    return matchSearch && matchStatus && matchType
-  })
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await api.getRooms({ search, status: statusFilter, type: typeFilter, page, limit: pageSize })
+      setRooms((res as any).data ?? [])
+      setTotal((res as any).total ?? 0)
+    } catch {
+      setError('Failed to load rooms')
+      setRooms([])
+      setTotal(0)
+    } finally {
+      setLoading(false)
+    }
+  }, [search, statusFilter, typeFilter, page, pageSize])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  const handleSearchChange = (value: string) => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+    searchDebounceRef.current = setTimeout(() => {
+      setSearch(value)
+      setPage(1)
+    }, 300)
+  }
+
+  const handleCloseRoom = async () => {
+    if (!confirmClose) return
+    setActionLoading(true)
+    try {
+      await api.closeRoom(confirmClose.id, 'Closed by admin')
+      toast.success(`Room "${confirmClose.title}" has been closed`)
+      setConfirmClose(null)
+      load()
+    } catch {
+      toast.error('Failed to close room')
+    } finally {
+      setActionLoading(false)
+    }
+  }
 
   const columns = [
     columnHelper.accessor('title', {
@@ -78,12 +96,27 @@ export default function RoomsPage() {
                 {room.status === 'live' && (
                   <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
                 )}
-                {room.isLocked && <span className="text-xs">🔒</span>}
               </div>
               <p className="text-dark-400 text-xs">by {room.host?.displayName}</p>
             </div>
           </div>
         )
+      },
+    }),
+    columnHelper.accessor('host', {
+      header: 'Host',
+      size: 160,
+      cell: (info) => {
+        const host = info.getValue() as any
+        return host ? (
+          <div className="flex items-center gap-2">
+            <Avatar src={host.avatar} name={host.displayName || host.username} size="xs" />
+            <div>
+              <p className="text-white text-sm">{host.displayName || host.username}</p>
+              <p className="text-dark-400 text-xs font-mono">{host.uid}</p>
+            </div>
+          </div>
+        ) : <span className="text-dark-400 text-sm">—</span>
       },
     }),
     columnHelper.accessor('type', {
@@ -105,31 +138,12 @@ export default function RoomsPage() {
         )
       },
     }),
-    columnHelper.accessor('totalViewers', {
-      header: 'Viewers',
-      size: 90,
-      cell: (info) => (
-        <span className="text-dark-300 text-sm">{formatNumber(info.getValue())}</span>
-      ),
-    }),
-    columnHelper.accessor('onlineCount', {
-      header: 'Online',
-      size: 80,
-      cell: (info) => (
-        <span className="text-green-400 font-medium text-sm">{formatNumber(info.getValue())}</span>
-      ),
-    }),
     columnHelper.accessor('totalGiftsValue', {
       header: 'Gifts 💎',
       size: 100,
       cell: (info) => (
-        <span className="text-amber-400 font-medium text-sm">{formatNumber(info.getValue())}</span>
+        <span className="text-amber-400 font-medium text-sm">{formatNumber(info.getValue() ?? 0)}</span>
       ),
-    }),
-    columnHelper.accessor('region', {
-      header: 'Region',
-      size: 80,
-      cell: (info) => <span className="text-dark-400 text-sm">{info.getValue() || '—'}</span>,
     }),
     columnHelper.accessor('status', {
       header: 'Status',
@@ -146,13 +160,13 @@ export default function RoomsPage() {
     columnHelper.display({
       id: 'actions',
       header: 'Actions',
-      size: 120,
+      size: 100,
       cell: ({ row }) => {
         const room = row.original
         return (
           <div className="flex items-center gap-1">
             <button
-              onClick={() => router.push(`/rooms/${room.id}`)}
+              onClick={() => router.push('/rooms/' + room.id)}
               className="p-1.5 rounded-lg text-dark-400 hover:text-white hover:bg-white/5 transition-all"
               title="View"
             >
@@ -167,13 +181,6 @@ export default function RoomsPage() {
                 <XCircleIcon className="w-4 h-4" />
               </button>
             )}
-            <button
-              onClick={() => setConfirmBan(room)}
-              className="p-1.5 rounded-lg text-dark-400 hover:text-red-400 hover:bg-red-500/10 transition-all"
-              title="Ban Room"
-            >
-              <NoSymbolIcon className="w-4 h-4" />
-            </button>
           </div>
         )
       },
@@ -182,20 +189,6 @@ export default function RoomsPage() {
 
   return (
     <div className="space-y-5 animate-fade-in">
-      {/* Live indicator */}
-      <div className="flex items-center gap-4 p-4 bg-green-500/5 border border-green-500/10 rounded-xl">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-          <span className="text-green-400 font-medium">
-            {mockRooms.filter(r => r.status === 'live').length} Live Rooms
-          </span>
-        </div>
-        <span className="text-dark-500">•</span>
-        <span className="text-dark-400 text-sm">
-          {formatNumber(mockRooms.filter(r => r.status === 'live').reduce((a, r) => a + r.onlineCount, 0))} users in rooms
-        </span>
-      </div>
-
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="flex-1 relative">
@@ -203,70 +196,38 @@ export default function RoomsPage() {
           <input
             type="text"
             placeholder="Search rooms or hosts..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+            defaultValue={search}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="input pl-10"
           />
         </div>
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className="btn-secondary"
-        >
-          <FunnelIcon className="w-4 h-4" />
-          Filters
-        </button>
+        <div className="flex items-center gap-2">
+          <select
+            value={typeFilter}
+            onChange={(e) => { setTypeFilter(e.target.value); setPage(1) }}
+            className="input text-sm"
+          >
+            <option value="">All Types</option>
+            <option value="public">Public</option>
+            <option value="private">Private</option>
+            <option value="family">Family</option>
+          </select>
+          <button
+            onClick={load}
+            className="p-2 rounded-lg bg-white/5 border border-white/10 text-dark-400 hover:text-white transition-all"
+            title="Refresh"
+          >
+            <ArrowPathIcon className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
-      {showFilters && (
-        <div className="card py-4 animate-slide-up">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="label">Status</label>
-              <select
-                value={statusFilter}
-                onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
-                className="input"
-              >
-                <option value="">All statuses</option>
-                <option value="live">Live</option>
-                <option value="ended">Ended</option>
-                <option value="banned">Banned</option>
-              </select>
-            </div>
-            <div>
-              <label className="label">Type</label>
-              <select
-                value={typeFilter}
-                onChange={(e) => { setTypeFilter(e.target.value); setPage(1) }}
-                className="input"
-              >
-                <option value="">All types</option>
-                <option value="public">Public</option>
-                <option value="private">Private</option>
-                <option value="family">Family</option>
-                <option value="agency">Agency</option>
-              </select>
-            </div>
-            <div>
-              <label className="label">Sort By</label>
-              <select className="input">
-                <option>Most Viewers</option>
-                <option>Most Gifts</option>
-                <option>Newest</option>
-                <option>Oldest</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Status tabs */}
+      {/* Status filter tabs */}
       <div className="flex gap-2">
         {[
-          { label: 'All', value: '', count: filtered.length },
-          { label: 'Live', value: 'live', count: mockRooms.filter(r => r.status === 'live').length },
-          { label: 'Ended', value: 'ended', count: mockRooms.filter(r => r.status === 'ended').length },
-          { label: 'Banned', value: 'banned', count: 0 },
+          { label: 'All', value: '' },
+          { label: 'Live', value: 'live' },
+          { label: 'Ended', value: 'ended' },
         ].map((tab) => (
           <button
             key={tab.value}
@@ -278,20 +239,29 @@ export default function RoomsPage() {
             }`}
           >
             {tab.label}
-            <span className="ml-2 text-xs opacity-70">({tab.count})</span>
           </button>
         ))}
       </div>
 
+      {/* Error state */}
+      {error && (
+        <div className="flex items-center justify-between p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+          <span className="text-red-400 text-sm">{error}</span>
+          <button onClick={load} className="text-red-400 hover:text-red-300 text-sm underline">
+            Retry
+          </button>
+        </div>
+      )}
+
       <div className="card p-0 overflow-hidden">
         <DataTable
-          data={paginated}
+          data={rooms}
           columns={columns}
-          total={filtered.length}
+          loading={loading}
+          total={total}
           page={page}
           pageSize={pageSize}
           onPageChange={setPage}
-          onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
           emptyMessage="No rooms found"
           className="p-4"
         />
@@ -300,26 +270,10 @@ export default function RoomsPage() {
       <ConfirmModal
         open={!!confirmClose}
         onClose={() => setConfirmClose(null)}
-        onConfirm={() => {
-          toast.success(`Room "${confirmClose?.title}" has been closed`)
-          setConfirmClose(null)
-        }}
+        onConfirm={handleCloseRoom}
         title="Force Close Room"
         message={`Force close "${confirmClose?.title}"? All current users will be disconnected.`}
         confirmLabel="Force Close"
-        loading={actionLoading}
-      />
-
-      <ConfirmModal
-        open={!!confirmBan}
-        onClose={() => setConfirmBan(null)}
-        onConfirm={() => {
-          toast.success(`Room "${confirmBan?.title}" has been banned`)
-          setConfirmBan(null)
-        }}
-        title="Ban Room"
-        message={`Ban "${confirmBan?.title}"? The host will not be able to create rooms.`}
-        confirmLabel="Ban Room"
         loading={actionLoading}
       />
     </div>

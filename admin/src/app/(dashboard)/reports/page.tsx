@@ -1,28 +1,28 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createColumnHelper } from '@tanstack/react-table'
 import {
   ShieldExclamationIcon,
   EyeIcon,
   NoSymbolIcon,
   XMarkIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline'
 import DataTable from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
 import Avatar from '@/components/ui/Avatar'
-import Modal from '@/components/ui/Modal'
+import Modal, { ConfirmModal } from '@/components/ui/Modal'
 import { api } from '@/lib/api'
 import { formatDateTime, timeAgo } from '@/lib/utils'
 import type { Report } from '@/types'
 import toast from 'react-hot-toast'
 
-type ReportRow = Report & { previousReports: number }
+type ReportRow = Report & { previousReports?: number }
 const columnHelper = createColumnHelper<ReportRow>()
 
-type ReportTab = 'pending' | 'reviewing' | 'resolved'
+type StatusFilter = '' | 'PENDING' | 'REVIEWING' | 'RESOLVED' | 'DISMISSED'
 
-const reportTypes = ['spam', 'harassment', 'nudity', 'hate_speech', 'scam', 'fake_account', 'violence', 'other']
 const typeColors: Record<string, string> = {
   spam: 'text-yellow-400 bg-yellow-500/20',
   harassment: 'text-red-400 bg-red-500/20',
@@ -32,121 +32,86 @@ const typeColors: Record<string, string> = {
   fake_account: 'text-blue-400 bg-blue-500/20',
   violence: 'text-red-500 bg-red-600/20',
   other: 'text-[#737373] bg-white/5',
+  USER: 'text-blue-400 bg-blue-500/20',
+  ROOM: 'text-green-400 bg-green-500/20',
+  MESSAGE: 'text-purple-400 bg-purple-500/20',
 }
 
-const mockReports: (Report & { previousReports: number })[] = Array.from({ length: 60 }, (_, i) => ({
-  id: `report-${i}`,
-  reporterId: `user-${i % 30}`,
-  reporter: {
-    id: `user-${i % 30}`,
-    uid: `U${10000 + i}`,
-    username: `reporter${i % 30}`,
-    displayName: `Reporter ${i % 30}`,
-    avatar: undefined,
-    level: 5,
-    vipLevel: 0 as const,
-    exp: 0,
-    coins: 0,
-    diamonds: 0,
-    status: 'active' as const,
-    isOnline: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    totalRecharged: 0,
-    totalWithdrawn: 0,
-    followersCount: 0,
-    followingCount: 0,
-    totalGiftsSent: 0,
-    totalGiftsReceived: 0,
-  },
-  targetId: `user-${(i + 5) % 30}`,
-  targetType: (['user', 'room', 'message'] as const)[i % 3],
-  targetUser: {
-    id: `user-${(i + 5) % 30}`,
-    uid: `U${20000 + i}`,
-    username: `target${(i + 5) % 30}`,
-    displayName: `Target User ${(i + 5) % 30}`,
-    avatar: undefined,
-    level: 15,
-    vipLevel: (i % 4) as 0|1|2|3,
-    exp: 0,
-    coins: 0,
-    diamonds: 0,
-    status: 'active' as const,
-    isOnline: i % 5 === 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    totalRecharged: 0,
-    totalWithdrawn: 0,
-    followersCount: 0,
-    followingCount: 0,
-    totalGiftsSent: 0,
-    totalGiftsReceived: 0,
-  },
-  reason: reportTypes[i % reportTypes.length],
-  description: 'This user is repeatedly sending unwanted messages and harassing other users in the room.',
-  evidence: i % 3 === 0 ? ['https://picsum.photos/400/300?random=' + i, 'https://picsum.photos/400/300?random=' + (i + 1)] : [],
-  status: (['pending', 'pending', 'reviewing', 'resolved', 'dismissed'] as const)[i % 5] as 'pending' | 'reviewing' | 'resolved' | 'dismissed',
-  createdAt: new Date(Date.now() - i * 3600000 * 4).toISOString(),
-  updatedAt: new Date(Date.now() - i * 3600000 * 2).toISOString(),
-  previousReports: Math.floor(Math.random() * 8),
-}))
+const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
+  { value: '', label: 'All' },
+  { value: 'PENDING', label: 'Pending' },
+  { value: 'REVIEWING', label: 'Reviewing' },
+  { value: 'RESOLVED', label: 'Resolved' },
+  { value: 'DISMISSED', label: 'Dismissed' },
+]
 
 export default function ReportsPage() {
-  const [activeTab, setActiveTab] = useState<ReportTab>('pending')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('PENDING')
+  const [reports, setReports] = useState<ReportRow[]>([])
+  const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
-  const [loading] = useState(false)
-  const [viewTarget, setViewTarget] = useState<(typeof mockReports)[0] | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const [viewTarget, setViewTarget] = useState<ReportRow | null>(null)
+  const [resolveTarget, setResolveTarget] = useState<ReportRow | null>(null)
+  const [resolveNote, setResolveNote] = useState('')
+  const [dismissTarget, setDismissTarget] = useState<ReportRow | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
 
-  const tabCounts = {
-    pending: mockReports.filter(r => r.status === 'pending').length,
-    reviewing: mockReports.filter(r => r.status === 'reviewing').length,
-    resolved: mockReports.filter(r => ['resolved', 'dismissed'].includes(r.status)).length,
-  }
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await api.getReports({
+        status: statusFilter || undefined,
+        page,
+        limit: pageSize,
+      })
+      setReports(((res as any).data ?? []) as ReportRow[])
+      setTotal((res as any).total ?? 0)
+    } catch {
+      setError('Failed to load reports')
+      setReports([])
+      setTotal(0)
+    } finally {
+      setLoading(false)
+    }
+  }, [statusFilter, page, pageSize])
 
-  const filtered = mockReports.filter(r => {
-    if (activeTab === 'pending') return r.status === 'pending'
-    if (activeTab === 'reviewing') return r.status === 'reviewing'
-    return ['resolved', 'dismissed'].includes(r.status)
-  })
-  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
+  useEffect(() => {
+    load()
+  }, [load])
 
-  const handleWarn = async (report: typeof mockReports[0]) => {
+  const handleResolve = async () => {
+    if (!resolveTarget) return
     setActionLoading(true)
     try {
-      await api.resolveReport(report.id, { action: 'warn', adminNote: 'Warning issued by admin' })
-      toast.success('User warned successfully')
+      await api.resolveReport(resolveTarget.id, { action: 'resolved', adminNote: resolveNote })
+      toast.success('Report resolved')
+      setResolveTarget(null)
+      setResolveNote('')
       setViewTarget(null)
+      load()
     } catch {
-      toast.error('Action failed')
+      toast.error('Failed to resolve report')
     } finally {
       setActionLoading(false)
     }
   }
 
-  const handleBan = async (report: typeof mockReports[0]) => {
+  const handleDismiss = async () => {
+    if (!dismissTarget) return
     setActionLoading(true)
     try {
-      await api.resolveReport(report.id, { action: 'ban_user', adminNote: 'Banned after report review' })
-      toast.success('User banned successfully')
-      setViewTarget(null)
-    } catch {
-      toast.error('Action failed')
-    } finally {
-      setActionLoading(false)
-    }
-  }
-
-  const handleDismiss = async (report: typeof mockReports[0]) => {
-    setActionLoading(true)
-    try {
-      await api.dismissReport(report.id, 'Report dismissed after review')
+      await api.dismissReport(dismissTarget.id, 'Dismissed by admin')
       toast.success('Report dismissed')
+      setDismissTarget(null)
       setViewTarget(null)
+      load()
     } catch {
-      toast.error('Action failed')
+      toast.error('Failed to dismiss report')
     } finally {
       setActionLoading(false)
     }
@@ -161,33 +126,31 @@ export default function ReportsPage() {
         return (
           <div className="flex items-center gap-2">
             <Avatar src={reporter?.avatar} name={reporter?.displayName || 'User'} size="xs" />
-            <span className="text-[#C0C0D0] text-sm">{reporter?.displayName}</span>
-          </div>
-        )
-      },
-    }),
-    columnHelper.accessor('targetUser', {
-      header: 'Target',
-      size: 160,
-      cell: (info) => {
-        const target = info.getValue()
-        const row = info.row.original
-        return (
-          <div className="flex items-center gap-2">
-            <Avatar src={target?.avatar} name={target?.displayName || 'User'} size="xs" />
             <div>
-              <p className="text-[#C0C0D0] text-sm">{target?.displayName}</p>
-              <p className="text-[#737373] text-xs">{row.targetType}</p>
+              <p className="text-[#C0C0D0] text-sm">{reporter?.displayName}</p>
+              <p className="text-[#737373] text-xs font-mono">{reporter?.uid}</p>
             </div>
           </div>
         )
       },
     }),
+    columnHelper.accessor('targetType', {
+      header: 'Target Type',
+      size: 110,
+      cell: (info) => {
+        const t = (info.getValue() as string) || ''
+        return (
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${typeColors[t] || 'text-[#737373] bg-white/5'}`}>
+            {t}
+          </span>
+        )
+      },
+    }),
     columnHelper.accessor('reason', {
-      header: 'Type',
+      header: 'Reason',
       size: 140,
       cell: (info) => {
-        const reason = info.getValue()
+        const reason = info.getValue() || ''
         return (
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${typeColors[reason] || 'text-[#737373] bg-white/5'}`}>
             {reason.replace(/_/g, ' ')}
@@ -195,12 +158,10 @@ export default function ReportsPage() {
         )
       },
     }),
-    columnHelper.accessor('description', {
-      header: 'Reason',
-      size: 200,
-      cell: (info) => (
-        <span className="text-[#A0A0B0] text-sm line-clamp-1">{info.getValue()}</span>
-      ),
+    columnHelper.accessor('status', {
+      header: 'Status',
+      size: 110,
+      cell: (info) => <Badge status={(info.getValue() as string)?.toLowerCase()} size="sm" />,
     }),
     columnHelper.accessor('createdAt', {
       header: 'Date',
@@ -209,17 +170,14 @@ export default function ReportsPage() {
         <span className="text-[#737373] text-sm">{timeAgo(info.getValue())}</span>
       ),
     }),
-    columnHelper.accessor('status', {
-      header: 'Status',
-      size: 110,
-      cell: (info) => <Badge status={info.getValue()} size="sm" />,
-    }),
     columnHelper.display({
       id: 'actions',
       header: 'Actions',
       size: 130,
       cell: ({ row }) => {
         const report = row.original
+        const status = (report.status as string)?.toUpperCase()
+        const isActive = status === 'PENDING' || status === 'REVIEWING'
         return (
           <div className="flex items-center gap-1">
             <button
@@ -229,27 +187,17 @@ export default function ReportsPage() {
             >
               <EyeIcon className="w-4 h-4" />
             </button>
-            {(report.status === 'pending' || report.status === 'reviewing') && (
+            {isActive && (
               <>
                 <button
-                  onClick={() => handleWarn(report)}
-                  disabled={actionLoading}
-                  className="p-1.5 rounded-lg text-[#737373] hover:text-yellow-400 hover:bg-yellow-500/10 transition-all"
-                  title="Warn User"
+                  onClick={() => { setResolveTarget(report); setResolveNote('') }}
+                  className="p-1.5 rounded-lg text-[#737373] hover:text-green-400 hover:bg-green-500/10 transition-all"
+                  title="Resolve"
                 >
                   <ShieldExclamationIcon className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => handleBan(report)}
-                  disabled={actionLoading}
-                  className="p-1.5 rounded-lg text-[#737373] hover:text-red-400 hover:bg-red-500/10 transition-all"
-                  title="Ban User"
-                >
-                  <NoSymbolIcon className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handleDismiss(report)}
-                  disabled={actionLoading}
+                  onClick={() => setDismissTarget(report)}
                   className="p-1.5 rounded-lg text-[#737373] hover:text-[#A0A0B0] hover:bg-white/5 transition-all"
                   title="Dismiss"
                 >
@@ -263,47 +211,51 @@ export default function ReportsPage() {
     }),
   ]
 
-  const tabs = [
-    { key: 'pending' as ReportTab, label: 'Pending' },
-    { key: 'reviewing' as ReportTab, label: 'In Review' },
-    { key: 'resolved' as ReportTab, label: 'Resolved' },
-  ]
-
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="card p-0 overflow-hidden">
-        <div className="border-b border-white/5 px-5">
-          <div className="flex gap-1 -mb-px">
-            {tabs.map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => { setActiveTab(tab.key); setPage(1) }}
-                className={`px-4 py-3.5 text-sm font-medium whitespace-nowrap transition-all border-b-2 ${
-                  activeTab === tab.key
-                    ? 'text-white border-[#7C3AED]'
-                    : 'text-[#737373] border-transparent hover:text-white'
-                }`}
-              >
-                {tab.label}
-                <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-bold ${
-                  activeTab === tab.key ? 'bg-[#7C3AED]/20 text-[#A78BFA]' : 'bg-white/5 text-[#737373]'
-                }`}>
-                  {tabCounts[tab.key]}
-                </span>
-              </button>
-            ))}
-          </div>
+      {/* Status filter tabs */}
+      <div className="flex gap-2 flex-wrap">
+        {STATUS_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => { setStatusFilter(opt.value); setPage(1) }}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              statusFilter === opt.value
+                ? 'bg-[#7C3AED]/20 text-[#A78BFA] border border-[#7C3AED]/30'
+                : 'text-[#737373] hover:text-white hover:bg-white/5'
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+        <button
+          onClick={load}
+          className="ml-auto p-2 rounded-lg bg-white/5 border border-white/10 text-[#737373] hover:text-white transition-all"
+          title="Refresh"
+        >
+          <ArrowPathIcon className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Error state */}
+      {error && (
+        <div className="flex items-center justify-between p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+          <span className="text-red-400 text-sm">{error}</span>
+          <button onClick={load} className="text-red-400 hover:text-red-300 text-sm underline">Retry</button>
         </div>
+      )}
+
+      <div className="card p-0 overflow-hidden">
         <DataTable
-          data={paginated}
+          data={reports}
           columns={columns}
           loading={loading}
-          total={filtered.length}
+          total={total}
           page={page}
           pageSize={pageSize}
           onPageChange={setPage}
           onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
-          emptyMessage="No reports in this category"
+          emptyMessage="No reports found"
           className="p-4"
         />
       </div>
@@ -325,16 +277,8 @@ export default function ReportsPage() {
               </div>
               <div className="bg-white/3 rounded-xl p-4">
                 <p className="text-[#737373] text-xs mb-2">Target ({viewTarget.targetType})</p>
-                <div className="flex items-center gap-2">
-                  <Avatar src={viewTarget.targetUser?.avatar} name={viewTarget.targetUser?.displayName || 'User'} size="sm" />
-                  <div>
-                    <p className="text-white text-sm font-medium">{viewTarget.targetUser?.displayName}</p>
-                    <p className="text-[#737373] text-xs">
-                      {viewTarget.previousReports > 0 && (
-                        <span className="text-red-400">{viewTarget.previousReports} previous reports</span>
-                      )}
-                    </p>
-                  </div>
+                <div>
+                  <p className="text-white text-sm font-medium">{viewTarget.targetId}</p>
                 </div>
               </div>
             </div>
@@ -342,68 +286,84 @@ export default function ReportsPage() {
             <div className="bg-white/3 rounded-xl p-4 space-y-2">
               <div className="flex items-center gap-3">
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${typeColors[viewTarget.reason] || 'text-[#737373] bg-white/5'}`}>
-                  {viewTarget.reason.replace(/_/g, ' ')}
+                  {viewTarget.reason?.replace(/_/g, ' ')}
                 </span>
                 <span className="text-[#737373] text-xs">{formatDateTime(viewTarget.createdAt)}</span>
-                <Badge status={viewTarget.status} size="sm" className="ml-auto" />
+                <Badge status={(viewTarget.status as string)?.toLowerCase()} size="sm" className="ml-auto" />
               </div>
-              <p className="text-[#C0C0D0] text-sm">{viewTarget.description}</p>
+              {viewTarget.description && (
+                <p className="text-[#C0C0D0] text-sm">{viewTarget.description}</p>
+              )}
             </div>
 
-            {viewTarget.evidence && viewTarget.evidence.length > 0 && (
-              <div>
-                <p className="text-[#737373] text-xs mb-3">Evidence ({viewTarget.evidence.length} items)</p>
-                <div className="grid grid-cols-2 gap-3">
-                  {viewTarget.evidence.map((url, idx) => (
-                    <img
-                      key={idx}
-                      src={url}
-                      alt={`Evidence ${idx + 1}`}
-                      className="w-full h-32 object-cover rounded-xl border border-white/10"
-                    />
-                  ))}
+            {(() => {
+              const status = (viewTarget.status as string)?.toUpperCase()
+              const isActive = status === 'PENDING' || status === 'REVIEWING'
+              return isActive ? (
+                <div className="flex items-center gap-3 pt-2 border-t border-white/5">
+                  <button
+                    onClick={() => { setDismissTarget(viewTarget); setViewTarget(null) }}
+                    disabled={actionLoading}
+                    className="btn-secondary flex-1"
+                  >
+                    Dismiss
+                  </button>
+                  <button
+                    onClick={() => { setResolveTarget(viewTarget); setResolveNote(''); setViewTarget(null) }}
+                    disabled={actionLoading}
+                    className="flex-1 bg-green-600/20 hover:bg-green-600/30 text-green-400 font-medium px-4 py-2 rounded-lg transition-all flex items-center justify-center gap-2 border border-green-500/20 disabled:opacity-50"
+                  >
+                    Resolve
+                  </button>
                 </div>
-              </div>
-            )}
-
-            {viewTarget.previousReports > 0 && (
-              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3">
-                <p className="text-red-400 text-sm">
-                  This user has been reported {viewTarget.previousReports} time{viewTarget.previousReports !== 1 ? 's' : ''} before.
-                </p>
-              </div>
-            )}
-
-            {(viewTarget.status === 'pending' || viewTarget.status === 'reviewing') && (
-              <div className="flex items-center gap-3 pt-2 border-t border-white/5">
-                <button
-                  onClick={() => handleDismiss(viewTarget)}
-                  disabled={actionLoading}
-                  className="btn-secondary flex-1"
-                >
-                  Dismiss
-                </button>
-                <button
-                  onClick={() => handleWarn(viewTarget)}
-                  disabled={actionLoading}
-                  className="flex-1 bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-400 font-medium px-4 py-2 rounded-lg transition-all flex items-center justify-center gap-2 border border-yellow-500/20 disabled:opacity-50"
-                >
-                  {actionLoading && <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />}
-                  Warn User
-                </button>
-                <button
-                  onClick={() => handleBan(viewTarget)}
-                  disabled={actionLoading}
-                  className="flex-1 btn-danger"
-                >
-                  {actionLoading && <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />}
-                  Ban User
-                </button>
-              </div>
-            )}
+              ) : null
+            })()}
           </div>
         )}
       </Modal>
+
+      {/* Resolve Modal */}
+      <Modal open={!!resolveTarget} onClose={() => { setResolveTarget(null); setResolveNote('') }} title="Resolve Report" size="sm">
+        <div className="space-y-4">
+          <p className="text-[#A0A0B0] text-sm">Resolve this report with an admin note.</p>
+          <div>
+            <label className="text-[#C0C0D0] text-sm font-medium block mb-1.5">
+              Admin Note
+            </label>
+            <textarea
+              value={resolveNote}
+              onChange={(e) => setResolveNote(e.target.value)}
+              placeholder="Enter resolution note..."
+              rows={3}
+              className="bg-white/5 border border-white/10 text-white placeholder-[#737373] rounded-lg px-4 py-2.5 w-full focus:outline-none focus:ring-2 focus:ring-[#7C3AED] focus:border-transparent resize-none"
+            />
+          </div>
+          <div className="flex justify-end gap-3">
+            <button onClick={() => { setResolveTarget(null); setResolveNote('') }} className="btn-secondary" disabled={actionLoading}>
+              Cancel
+            </button>
+            <button
+              onClick={handleResolve}
+              disabled={actionLoading}
+              className="bg-green-600/20 hover:bg-green-600/30 text-green-400 font-medium px-4 py-2 rounded-lg transition-all flex items-center gap-2 border border-green-500/20 disabled:opacity-50"
+            >
+              {actionLoading && <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />}
+              Resolve
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Dismiss Confirm */}
+      <ConfirmModal
+        open={!!dismissTarget}
+        onClose={() => setDismissTarget(null)}
+        onConfirm={handleDismiss}
+        title="Dismiss Report"
+        message="Are you sure you want to dismiss this report? It will be marked as dismissed."
+        confirmLabel="Dismiss"
+        loading={actionLoading}
+      />
     </div>
   )
 }

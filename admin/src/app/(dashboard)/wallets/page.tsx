@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createColumnHelper } from '@tanstack/react-table'
 import {
   CurrencyDollarIcon,
   CubeIcon,
   ArrowTrendingUpIcon,
-  CalendarIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline'
 import StatsCard from '@/components/ui/StatsCard'
 import DataTable from '@/components/ui/DataTable'
@@ -16,58 +16,8 @@ import { ChartCard, VoxoAreaChart } from '@/components/ui/Chart'
 import { api } from '@/lib/api'
 import { formatNumber, formatDateTime } from '@/lib/utils'
 import type { WalletTransaction } from '@/types'
-import toast from 'react-hot-toast'
 
 const columnHelper = createColumnHelper<WalletTransaction>()
-
-const mockStats = {
-  totalCoins: 48_250_000,
-  totalDiamonds: 3_940_000,
-  todayRecharge: 18_420,
-  weekRecharge: 94_800,
-  monthRecharge: 312_000,
-}
-
-const mockRevenueData = Array.from({ length: 30 }, (_, i) => ({
-  date: new Date(Date.now() - (29 - i) * 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-  revenue: Math.floor(Math.random() * 20000) + 6000,
-  coins: Math.floor(Math.random() * 500000) + 100000,
-}))
-
-const mockTransactions: WalletTransaction[] = Array.from({ length: 80 }, (_, i) => ({
-  id: `tx-${i}`,
-  userId: `user-${i % 20}`,
-  user: {
-    id: `user-${i % 20}`,
-    uid: `U${10000 + i}`,
-    username: `user${i % 20}`,
-    displayName: `User ${i % 20}`,
-    avatar: undefined,
-    level: 10,
-    vipLevel: 0,
-    exp: 0,
-    coins: 0,
-    diamonds: 0,
-    status: 'active' as const,
-    isOnline: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    totalRecharged: 0,
-    totalWithdrawn: 0,
-    followersCount: 0,
-    followingCount: 0,
-    totalGiftsSent: 0,
-    totalGiftsReceived: 0,
-  },
-  type: (['recharge', 'gift_sent', 'gift_received', 'withdrawal', 'vip_purchase', 'coins_purchase', 'bonus'] as const)[i % 7],
-  amount: Math.floor(Math.random() * 5000) + 10,
-  currency: (['coins', 'diamonds', 'usd'] as const)[i % 3],
-  description: ['Coin recharge via PayPal', 'Gift sent in room', 'Gift received', 'Withdrawal request', 'VIP subscription', 'Coin package purchase', 'Bonus coins'][i % 7],
-  balanceBefore: Math.floor(Math.random() * 10000),
-  balanceAfter: Math.floor(Math.random() * 15000),
-  status: (['completed', 'completed', 'completed', 'pending', 'failed'] as const)[i % 5],
-  createdAt: new Date(Date.now() - i * 3600000 * 2).toISOString(),
-}))
 
 const typeLabels: Record<string, string> = {
   recharge: 'Recharge',
@@ -96,19 +46,53 @@ const typeColors: Record<string, string> = {
 }
 
 export default function WalletsPage() {
+  const [stats, setStats] = useState<any>(null)
+  const [txs, setTxs] = useState<any[]>([])
+  const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [typeFilter, setTypeFilter] = useState('')
-  const [currencyFilter, setCurrencyFilter] = useState('')
-  const [loading] = useState(false)
+  const [loadingStats, setLoadingStats] = useState(true)
+  const [loadingTxs, setLoadingTxs] = useState(true)
+  const [statsError, setStatsError] = useState<string | null>(null)
+  const [txsError, setTxsError] = useState<string | null>(null)
 
-  const filtered = mockTransactions.filter((tx) => {
-    const matchType = !typeFilter || tx.type === typeFilter
-    const matchCurrency = !currencyFilter || tx.currency === currencyFilter
-    return matchType && matchCurrency
-  })
+  const loadStats = useCallback(async () => {
+    setLoadingStats(true)
+    setStatsError(null)
+    try {
+      const data = await api.getWalletStats()
+      setStats(data)
+    } catch {
+      setStatsError('Failed to load wallet stats')
+    } finally {
+      setLoadingStats(false)
+    }
+  }, [])
 
-  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
+  const loadTxs = useCallback(async () => {
+    setLoadingTxs(true)
+    setTxsError(null)
+    try {
+      const res = await api.getTransactions({ type: typeFilter || undefined, page, limit: pageSize })
+      setTxs((res as any).data ?? [])
+      setTotal((res as any).total ?? 0)
+    } catch {
+      setTxsError('Failed to load transactions')
+      setTxs([])
+      setTotal(0)
+    } finally {
+      setLoadingTxs(false)
+    }
+  }, [typeFilter, page, pageSize])
+
+  useEffect(() => {
+    loadStats()
+  }, [loadStats])
+
+  useEffect(() => {
+    loadTxs()
+  }, [loadTxs])
 
   const columns = [
     columnHelper.accessor('user', {
@@ -146,7 +130,7 @@ export default function WalletsPage() {
         const c = info.getValue()
         return (
           <span className={`text-sm font-medium ${c === 'coins' ? 'text-yellow-400' : c === 'diamonds' ? 'text-blue-400' : 'text-green-400'}`}>
-            {c === 'coins' ? '🪙' : c === 'diamonds' ? '💎' : '$'} {c.toUpperCase()}
+            {c === 'coins' ? '🪙' : c === 'diamonds' ? '💎' : '$'} {c?.toUpperCase()}
           </span>
         )
       },
@@ -163,6 +147,13 @@ export default function WalletsPage() {
           </span>
         )
       },
+    }),
+    columnHelper.accessor('description', {
+      header: 'Description',
+      size: 200,
+      cell: (info) => (
+        <span className="text-[#A0A0B0] text-sm truncate block max-w-[180px]">{info.getValue() || '—'}</span>
+      ),
     }),
     columnHelper.accessor('status', {
       header: 'Status',
@@ -181,60 +172,77 @@ export default function WalletsPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatsCard
-          title="Total Coins in Circulation"
-          value={formatNumber(mockStats.totalCoins)}
-          icon={CubeIcon}
-          iconColor="text-yellow-400"
-          iconBg="bg-yellow-600/20"
-          description="Active coin supply"
-        />
-        <StatsCard
-          title="Total Diamonds"
-          value={formatNumber(mockStats.totalDiamonds)}
-          icon={CubeIcon}
-          iconColor="text-blue-400"
-          iconBg="bg-blue-600/20"
-          description="Active diamond supply"
-        />
-        <StatsCard
-          title="Revenue Today"
-          value={`$${formatNumber(mockStats.todayRecharge)}`}
-          change={23.1}
-          icon={CurrencyDollarIcon}
-          iconColor="text-green-400"
-          iconBg="bg-green-600/20"
-          description="All payment methods"
-        />
-        <StatsCard
-          title="Revenue This Month"
-          value={`$${formatNumber(mockStats.monthRecharge)}`}
-          change={8.4}
-          icon={ArrowTrendingUpIcon}
-          iconColor="text-purple-400"
-          iconBg="bg-purple-600/20"
-          description={`$${formatNumber(mockStats.weekRecharge)} this week`}
-        />
-      </div>
+      {statsError ? (
+        <div className="flex items-center justify-between p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+          <span className="text-red-400 text-sm">{statsError}</span>
+          <button onClick={loadStats} className="text-red-400 hover:text-red-300 text-sm underline">Retry</button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+          <StatsCard
+            title="Total Coins"
+            value={formatNumber(stats?.totalCoins ?? 0)}
+            icon={CubeIcon}
+            iconColor="text-yellow-400"
+            iconBg="bg-yellow-600/20"
+            description="Active coin supply"
+            loading={loadingStats}
+          />
+          <StatsCard
+            title="Total Diamonds"
+            value={formatNumber(stats?.totalDiamonds ?? 0)}
+            icon={CubeIcon}
+            iconColor="text-blue-400"
+            iconBg="bg-blue-600/20"
+            description="Active diamond supply"
+            loading={loadingStats}
+          />
+          <StatsCard
+            title="Today Recharge"
+            value={`$${formatNumber(stats?.todayRecharge ?? 0)}`}
+            icon={CurrencyDollarIcon}
+            iconColor="text-green-400"
+            iconBg="bg-green-600/20"
+            description="Today's total"
+            loading={loadingStats}
+          />
+          <StatsCard
+            title="Week Recharge"
+            value={`$${formatNumber(stats?.weekRecharge ?? 0)}`}
+            icon={ArrowTrendingUpIcon}
+            iconColor="text-purple-400"
+            iconBg="bg-purple-600/20"
+            description="This week"
+            loading={loadingStats}
+          />
+          <StatsCard
+            title="Month Recharge"
+            value={`$${formatNumber(stats?.monthRecharge ?? 0)}`}
+            icon={ArrowTrendingUpIcon}
+            iconColor="text-teal-400"
+            iconBg="bg-teal-600/20"
+            description="This month"
+            loading={loadingStats}
+          />
+        </div>
+      )}
 
-      {/* Revenue Chart */}
+      {/* Revenue Chart placeholder */}
       <ChartCard
         title="Daily Revenue (Last 30 Days)"
-        subtitle="Total USD collected per day across all payment methods"
+        subtitle="Total collected per day across all payment methods"
         height={280}
         actions={
-          <div className="flex items-center gap-2">
-            <select className="bg-white/5 border border-white/10 text-[#A0A0B0] text-xs rounded-lg px-3 py-1.5 focus:outline-none">
-              <option>Last 30 days</option>
-              <option>Last 90 days</option>
-              <option>Last year</option>
-            </select>
-          </div>
+          <button
+            onClick={loadStats}
+            className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-[#737373] hover:text-white transition-all"
+          >
+            <ArrowPathIcon className="w-4 h-4" />
+          </button>
         }
       >
         <VoxoAreaChart
-          data={mockRevenueData}
+          data={[]}
           xKey="date"
           areas={[
             { key: 'revenue', label: 'Revenue ($)', color: '#7C3AED' },
@@ -257,28 +265,28 @@ export default function WalletsPage() {
                 <option key={value} value={value}>{label}</option>
               ))}
             </select>
-            <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-lg p-1">
-              {(['', 'coins', 'diamonds', 'usd'] as const).map((c) => (
-                <button
-                  key={c}
-                  onClick={() => { setCurrencyFilter(c); setPage(1) }}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                    currencyFilter === c
-                      ? 'bg-[#7C3AED] text-white'
-                      : 'text-[#737373] hover:text-white'
-                  }`}
-                >
-                  {c === '' ? 'All' : c === 'coins' ? '🪙 Coins' : c === 'diamonds' ? '💎 Diamonds' : '$ USD'}
-                </button>
-              ))}
-            </div>
+            <button
+              onClick={loadTxs}
+              className="p-2 rounded-lg bg-white/5 border border-white/10 text-[#737373] hover:text-white transition-all"
+              title="Refresh"
+            >
+              <ArrowPathIcon className="w-4 h-4" />
+            </button>
           </div>
         </div>
+
+        {txsError && (
+          <div className="flex items-center justify-between mx-5 mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
+            <span className="text-red-400 text-sm">{txsError}</span>
+            <button onClick={loadTxs} className="text-red-400 hover:text-red-300 text-sm underline">Retry</button>
+          </div>
+        )}
+
         <DataTable
-          data={paginated}
+          data={txs}
           columns={columns}
-          loading={loading}
-          total={filtered.length}
+          loading={loadingTxs}
+          total={total}
           page={page}
           pageSize={pageSize}
           onPageChange={setPage}
