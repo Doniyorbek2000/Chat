@@ -1,0 +1,71 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Docker image tag to deploy (default: latest)'
+        required: false
+        default: 'latest'
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+jobs:
+  deploy:
+    name: Deploy ${{ github.event.inputs.environment }}
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.environment }}
+      url: ${{ github.event.inputs.environment == 'production' && 'https://api.voxo.uz' || 'https://api-staging.voxo.uz' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ github.event.inputs.environment == 'production' && secrets.PROD_HOST || secrets.STAGING_HOST }}
+          username: ${{ github.event.inputs.environment == 'production' && secrets.PROD_USER || secrets.STAGING_USER }}
+          key: ${{ github.event.inputs.environment == 'production' && secrets.PROD_SSH_KEY || secrets.STAGING_SSH_KEY }}
+          port: 22
+          envs: IMAGE_TAG
+          script: |
+            set -e
+            export IMAGE_TAG=${{ github.event.inputs.image_tag }}
+            cd /opt/voxo
+
+            echo "=== Pulling latest config ==="
+            git fetch origin main && git checkout origin/main -- docker-compose.prod.yml nginx/
+
+            echo "=== Pre-deploy database backup ==="
+            bash scripts/backup-postgres.sh || echo "Backup warning (non-fatal)"
+
+            echo "=== Pulling images ==="
+            docker compose -f docker-compose.prod.yml pull voxo-backend voxo-admin
+
+            echo "=== Stopping old containers ==="
+            docker compose -f docker-compose.prod.yml stop voxo-backend voxo-admin
+
+            echo "=== Starting new containers ==="
+            docker compose -f docker-compose.prod.yml up -d voxo-backend voxo-admin
+
+            echo "=== Running migrations ==="
+            sleep 15
+            docker compose -f docker-compose.prod.yml exec -T voxo-backend npx prisma migrate deploy
+
+            echo "=== Health check ==="
+            for i in 1 2 3 4 5; do
+              sleep 8
+              curl -sf http://localhost/health && echo "Health OK" && break || echo "Attempt $i failed"
+              if [ $i -eq 5 ]; then echo "Health check failed!" && exit 1; fi
+            done
+
+            echo "=== Deploy complete ==="
+            docker compose -f docker-compose.prod.yml ps
