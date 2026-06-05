@@ -76,6 +76,9 @@ mobile/ios/**/*.xcuserstate
 mobile/android/.gradle/
 mobile/android/local.properties
 mobile/android/key.properties
+mobile/android/upload-keystore.jks
+mobile/android/*.jks
+mobile/android/*.keystore
 mobile/android/app/keystore.jks
 mobile/android/**/GeneratedPluginRegistrant.java
 mobile/android/captures/
