@@ -38,6 +38,7 @@ import { ReferralsModule } from './modules/referrals/referrals.module';
 import { HomeModule } from './modules/home/home.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { SupportModule } from './modules/support/support.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -105,6 +106,7 @@ import { SupportModule } from './modules/support/support.module';
     HomeModule,
     SettingsModule,
     SupportModule,
+    HealthModule,
   ],
 })
 export class AppModule {}
