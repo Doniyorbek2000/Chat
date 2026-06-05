@@ -1148,6 +1148,38 @@ async function seedNameplates() {
   console.log(`  Seeded ${created} nameplates.`);
 }
 
+async function seedPolicyPages() {
+  console.log('Seeding policy pages...');
+
+  const policySlugTitles = [
+    { slug: 'privacy-policy', title: 'Maxfiylik siyosati', language: 'uz' },
+    { slug: 'terms-of-service', title: 'Foydalanish shartlari', language: 'uz' },
+    { slug: 'community-guidelines', title: 'Jamiyat qoidalari', language: 'uz' },
+    { slug: 'cookie-policy', title: 'Cookie siyosati', language: 'uz' },
+    { slug: 'refund-policy', title: 'Qaytarish siyosati', language: 'uz' },
+    { slug: 'about', title: 'VOXO haqida', language: 'uz' },
+    { slug: 'help', title: 'Yordam markazi', language: 'uz' },
+  ];
+
+  for (const p of policySlugTitles) {
+    await prisma.policyPage.upsert({
+      where: { slug: p.slug },
+      update: {},
+      create: {
+        slug: p.slug,
+        title: p.title,
+        language: p.language,
+        content: `# ${p.title}\n\nBu sahifa tez orada to'ldiriladi.`,
+        isPublished: true,
+        publishedAt: new Date(),
+        version: '1.0',
+      },
+    });
+  }
+
+  console.log(`  Seeded ${policySlugTitles.length} policy pages.`);
+}
+
 async function main() {
   console.log('Starting VOXO database seed...\n');
 
@@ -1196,6 +1228,9 @@ async function main() {
   await seedShopItems();
   await seedRoomThemes();
   await seedNameplates();
+
+  // Stage 6 seeds
+  await seedPolicyPages();
 
   console.log('\nVOXO seed completed successfully!');
   console.log('-----------------------------------');

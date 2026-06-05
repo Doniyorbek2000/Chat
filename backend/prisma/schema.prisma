@@ -228,6 +228,26 @@ enum UserRole {
   MODERATOR
 }
 
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum LinkedAccountType {
+  PHONE
+  EMAIL
+  GOOGLE
+  APPLE
+}
+
+enum DeletionStatus {
+  SCHEDULED
+  CANCELLED
+  COMPLETED
+}
+
 // ==================== USER ====================
 
 model User {
@@ -323,6 +343,14 @@ model User {
   refereeRelation      ReferralRelation?     @relation("RefereeRelation")
   referralRewards      ReferralReward[]
   referralPayouts      ReferralPayout[]
+  settings             UserSettings?
+  linkedAccounts       UserLinkedAccount[]
+  blockedUsers         BlockedUser[]         @relation("Blocker")
+  blockedByUsers       BlockedUser[]         @relation("Blocked")
+  supportTickets       SupportTicket[]
+  supportReplies       SupportReply[]
+  uploadedLogs         UploadedLog[]
+  deletionRequest      AccountDeletionRequest?
 
   @@index([phone])
   @@index([email])
@@ -1701,4 +1729,169 @@ model NotificationCategory {
   createdAt DateTime @default(now())
 
   @@map("notification_categories")
+}
+
+// ==================== USER SETTINGS ====================
+
+model UserSettings {
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  language               String   @default("uz")
+  notifyGifts            Boolean  @default(true)
+  notifyFollowers        Boolean  @default(true)
+  notifyMessages         Boolean  @default(true)
+  notifySystem           Boolean  @default(true)
+  profileVisible         Boolean  @default(true)
+  showOnline             Boolean  @default(true)
+  showLocation           Boolean  @default(true)
+  allowFollow            Boolean  @default(true)
+  allowMessages          String   @default("everyone") // everyone | following | nobody
+  noiseCancellation      Boolean  @default(true)
+  audioQuality           String   @default("high") // low | medium | high
+  updatedAt              DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
+}
+
+// ==================== LINKED ACCOUNTS ====================
+
+model UserLinkedAccount {
+  id          String            @id @default(cuid())
+  userId      String
+  type        LinkedAccountType
+  identifier  String
+  isVerified  Boolean           @default(false)
+  isPrimary   Boolean           @default(false)
+  verifiedAt  DateTime?
+  createdAt   DateTime          @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@index([userId])
+  @@map("user_linked_accounts")
+}
+
+// ==================== BLOCKED USERS ====================
+
+model BlockedUser {
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  blocker User @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@map("blocked_users")
+}
+
+// ==================== POLICY PAGES ====================
+
+model PolicyPage {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  content     String   @db.Text
+  language    String   @default("uz")
+  version     String   @default("1.0")
+  isPublished Boolean  @default(false)
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([slug])
+  @@map("policy_pages")
+}
+
+// ==================== SUPPORT TICKETS ====================
+
+model SupportTicket {
+  id          String              @id @default(cuid())
+  userId      String
+  category    String
+  title       String
+  body        String              @db.Text
+  status      SupportTicketStatus @default(OPEN)
+  adminNote   String?
+  resolvedAt  DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attachments SupportAttachment[]
+  replies     SupportReply[]
+
+  @@index([userId])
+  @@index([status])
+  @@map("support_tickets")
+}
+
+model SupportAttachment {
+  id        String   @id @default(cuid())
+  ticketId  String
+  url       String
+  fileName  String
+  mimeType  String
+  sizeBytes Int
+  createdAt DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@map("support_attachments")
+}
+
+model SupportReply {
+  id        String   @id @default(cuid())
+  ticketId  String
+  authorId  String
+  body      String   @db.Text
+  isAdmin   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@map("support_replies")
+}
+
+// ==================== UPLOADED LOGS ====================
+
+model UploadedLog {
+  id          String   @id @default(cuid())
+  userId      String
+  fileName    String
+  appVersion  String?
+  deviceInfo  String?
+  platform    String?
+  logContent  String   @db.Text
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("uploaded_logs")
+}
+
+// ==================== ACCOUNT DELETION ====================
+
+model AccountDeletionRequest {
+  id          String         @id @default(cuid())
+  userId      String         @unique
+  reason      String?
+  status      DeletionStatus @default(SCHEDULED)
+  scheduledAt DateTime
+  cancelledAt DateTime?
+  completedAt DateTime?
+  createdAt   DateTime       @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("account_deletion_requests")
 }

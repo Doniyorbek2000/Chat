@@ -36,6 +36,8 @@ import { CollectionModule } from './modules/collection/collection.module';
 import { DiscoverModule } from './modules/discover/discover.module';
 import { ReferralsModule } from './modules/referrals/referrals.module';
 import { HomeModule } from './modules/home/home.module';
+import { SettingsModule } from './modules/settings/settings.module';
+import { SupportModule } from './modules/support/support.module';
 
 @Module({
   imports: [
@@ -101,6 +103,8 @@ import { HomeModule } from './modules/home/home.module';
     DiscoverModule,
     ReferralsModule,
     HomeModule,
+    SettingsModule,
+    SupportModule,
   ],
 })
 export class AppModule {}
