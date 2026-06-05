@@ -505,6 +505,61 @@ class ApiClient {
   async deleteNameplate(id: string): Promise<void> {
     return this.request({ url: `/admin/nameplates/${id}`, method: 'DELETE' })
   }
+
+  // ============ DISCOVER ============
+  async getDiscoverPosts(params?: { status?: string; page?: number; limit?: number }): Promise<any> {
+    return this.request({ url: '/admin/discover/posts', method: 'GET', params })
+  }
+
+  async approveDiscoverPost(id: string): Promise<any> {
+    return this.request({ url: `/admin/discover/posts/${id}/approve`, method: 'POST', data: {} })
+  }
+
+  async rejectDiscoverPost(id: string, reason?: string): Promise<any> {
+    return this.request({ url: `/admin/discover/posts/${id}/reject`, method: 'POST', data: { reason } })
+  }
+
+  async getDiscoverReports(params?: { resolved?: boolean; page?: number }): Promise<any> {
+    return this.request({ url: '/admin/discover/reports', method: 'GET', params })
+  }
+
+  async resolveDiscoverReport(id: string): Promise<any> {
+    return this.request({ url: `/admin/discover/reports/${id}/resolve`, method: 'POST', data: {} })
+  }
+
+  // ============ REFERRALS ============
+  async getAdminReferrals(params?: { page?: number; limit?: number }): Promise<any> {
+    return this.request({ url: '/admin/referrals', method: 'GET', params })
+  }
+
+  async getReferralRules(): Promise<any> {
+    return this.request({ url: '/admin/referrals/rules', method: 'GET' })
+  }
+
+  async createReferralRule(data: { level: number; rebatePercent: number; minRechargeUSD?: number; isActive?: boolean }): Promise<any> {
+    return this.request({ url: '/admin/referrals/rules', method: 'POST', data })
+  }
+
+  async updateReferralRule(id: string, data: { rebatePercent?: number; isActive?: boolean }): Promise<any> {
+    return this.request({ url: `/admin/referrals/rules/${id}`, method: 'PATCH', data })
+  }
+
+  // ============ NOTIFICATION CATEGORIES ============
+  async getNotificationCategories(): Promise<any> {
+    return this.request({ url: '/admin/notifications/categories', method: 'GET' })
+  }
+
+  async createNotificationCategory(data: { key: string; label: string; icon?: string; sortOrder?: number }): Promise<any> {
+    return this.request({ url: '/admin/notifications/categories', method: 'POST', data })
+  }
+
+  async updateNotificationCategory(id: string, data: Record<string, any>): Promise<any> {
+    return this.request({ url: `/admin/notifications/categories/${id}`, method: 'PATCH', data })
+  }
+
+  async deleteNotificationCategory(id: string): Promise<void> {
+    return this.request({ url: `/admin/notifications/categories/${id}`, method: 'DELETE' })
+  }
 }
 
 export const api = new ApiClient()

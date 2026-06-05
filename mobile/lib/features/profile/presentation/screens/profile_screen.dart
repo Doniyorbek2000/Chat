@@ -61,7 +61,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 _buildStatsRow(user),
                 if (!isOwn) _buildActionButtons(user),
                 if (isOwn) _buildPremiumShortcuts(),
-                _buildRecentRooms(),
+                if (isOwn) _buildMenMenu(),
+                if (!isOwn) _buildRecentRooms(),
                 const SizedBox(height: 40),
               ],
             ),
@@ -554,6 +555,47 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMenMenu() {
+    final menuItems = [
+      {'label': 'Taklif qilish orqali tangalar olish', 'icon': Icons.people_outline, 'route': '/referral'},
+      {'label': 'Hamyon', 'icon': Icons.account_balance_wallet_outlined, 'route': AppRoutes.wallet},
+      {'label': 'Aristokratiya', 'icon': Icons.auto_awesome_outlined, 'route': AppRoutes.noble},
+      {'label': 'Kolleksiya Zali', 'icon': Icons.inventory_2_outlined, 'route': AppRoutes.collection},
+      {'label': 'Ismlik taxtasi', 'icon': Icons.badge_outlined, 'route': AppRoutes.nameplate},
+      {'label': 'Sevgi uyi', 'icon': Icons.favorite_border, 'route': AppRoutes.couple},
+      {'label': 'Oila', 'icon': Icons.group_outlined, 'route': AppRoutes.family},
+      {'label': 'Sozlamalar', 'icon': Icons.settings_outlined, 'route': AppRoutes.settings},
+    ];
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.cardDark,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
+      ),
+      child: Column(
+        children: menuItems.asMap().entries.map((e) {
+          final item = e.value;
+          final isLast = e.key == menuItems.length - 1;
+          return Column(children: [
+            ListTile(
+              leading: Container(
+                width: 36, height: 36,
+                decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+                child: Icon(item['icon'] as IconData, color: AppColors.primary, size: 18),
+              ),
+              title: Text(item['label'] as String, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
+              trailing: const Icon(Icons.chevron_right, color: Colors.white24, size: 18),
+              onTap: () => context.push(item['route'] as String),
+              dense: true,
+            ),
+            if (!isLast) const Divider(height: 1, color: Colors.white10, indent: 60),
+          ]);
+        }).toList(),
       ),
     );
   }

@@ -25,12 +25,20 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles, Role } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { DiscoverService } from '../discover/discover.service';
+import { ReferralsService } from '../referrals/referrals.service';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN, Role.SUPER_ADMIN)
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly discoverService: DiscoverService,
+    private readonly referralsService: ReferralsService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   // ==================== DASHBOARD ====================
 
@@ -308,5 +316,97 @@ export class AdminController {
   @Delete('nameplates/:id')
   deleteNameplate(@Param('id') id: string) {
     return this.adminService.deleteNameplate(id);
+  }
+
+  // ==================== DISCOVER (ADMIN) ====================
+
+  @Get('discover/posts')
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN, Role.MODERATOR)
+  adminDiscoverPosts(
+    @Query('status') status?: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page = 1,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit = 20,
+  ) {
+    return this.discoverService.adminGetPosts({ status, page, limit });
+  }
+
+  @Post('discover/posts/:id/approve')
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN, Role.MODERATOR)
+  approvePost(@Param('id') id: string) {
+    return this.discoverService.adminApprovePost(id);
+  }
+
+  @Post('discover/posts/:id/reject')
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN, Role.MODERATOR)
+  rejectPost(@Param('id') id: string, @Body() body: { reason?: string }) {
+    return this.discoverService.adminRejectPost(id, body.reason);
+  }
+
+  @Get('discover/reports')
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN, Role.MODERATOR)
+  getDiscoverReports(
+    @Query('resolved') resolved?: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page = 1,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit = 20,
+  ) {
+    return this.discoverService.adminGetReports({
+      resolved: resolved !== undefined ? resolved === 'true' : undefined,
+      page,
+      limit,
+    });
+  }
+
+  @Post('discover/reports/:id/resolve')
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN, Role.MODERATOR)
+  resolveReport(@Param('id') id: string) {
+    return this.discoverService.adminResolveReport(id);
+  }
+
+  // ==================== REFERRALS (ADMIN) ====================
+
+  @Get('referrals')
+  adminGetReferrals(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page = 1,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit = 20,
+  ) {
+    return this.referralsService.adminGetReferrals(page, limit);
+  }
+
+  @Get('referrals/rules')
+  getRebateRules() {
+    return this.referralsService.adminGetRules();
+  }
+
+  @Post('referrals/rules')
+  createRebateRule(@Body() dto: any) {
+    return this.referralsService.adminCreateRule(dto);
+  }
+
+  @Patch('referrals/rules/:id')
+  updateRebateRule(@Param('id') id: string, @Body() dto: any) {
+    return this.referralsService.adminUpdateRule(id, dto);
+  }
+
+  // ==================== NOTIFICATION CATEGORIES (ADMIN) ====================
+
+  @Get('notifications/categories')
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN, Role.MODERATOR)
+  getNotifCategories() {
+    return this.prisma.notificationCategory.findMany({ orderBy: { sortOrder: 'asc' } });
+  }
+
+  @Post('notifications/categories')
+  createNotifCategory(@Body() body: { key: string; label: string; icon?: string; sortOrder?: number; isActive?: boolean }) {
+    return this.prisma.notificationCategory.create({ data: body });
+  }
+
+  @Patch('notifications/categories/:id')
+  updateNotifCategory(@Param('id') id: string, @Body() body: any) {
+    return this.prisma.notificationCategory.update({ where: { id }, data: body });
+  }
+
+  @Delete('notifications/categories/:id')
+  deleteNotifCategory(@Param('id') id: string) {
+    return this.prisma.notificationCategory.delete({ where: { id } });
   }
 }

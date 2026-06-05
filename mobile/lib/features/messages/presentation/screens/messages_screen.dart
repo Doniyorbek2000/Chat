@@ -1,9 +1,12 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import '../../../../core/theme/app_colors.dart';
+
 import '../../../../core/network/api_client.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../home/presentation/screens/home_screen.dart';
 
 class MessagesScreen extends ConsumerStatefulWidget {
   const MessagesScreen({super.key});
@@ -12,190 +15,240 @@ class MessagesScreen extends ConsumerStatefulWidget {
   ConsumerState<MessagesScreen> createState() => _MessagesScreenState();
 }
 
-class _MessagesScreenState extends ConsumerState<MessagesScreen> {
+class _MessagesScreenState extends ConsumerState<MessagesScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tab;
+  List<Map<String, dynamic>> _notifications = [];
   List<Map<String, dynamic>> _conversations = [];
-  bool _loading = true;
+  bool _loadingNotifs = true;
+  bool _loadingConvs = true;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _tab = TabController(length: 2, vsync: this);
+    _tab.addListener(() => setState(() {}));
+    _loadNotifications();
+    _loadConversations();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  @override
+  void dispose() {
+    _tab.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadNotifications() async {
+    setState(() => _loadingNotifs = true);
     try {
       final api = ref.read(apiClientProvider);
-      final response = await api.get('/chat/conversations');
-      if (response.statusCode == 200 && mounted) {
-        final data = response.data['data'] ?? response.data['items'] ?? response.data;
-        setState(() {
-          _conversations = (data as List? ?? [])
-              .map((e) => Map<String, dynamic>.from(e as Map)).toList();
-          _loading = false;
-        });
-      }
+      final res = await api.get('/notifications?limit=50');
+      if (!mounted) return;
+      final data = res.data['data'] ?? res.data;
+      final items = (data is Map ? (data['items'] ?? data) : data) as List? ?? [];
+      setState(() {
+        _notifications = items.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        _loadingNotifs = false;
+      });
+      // Update unread badge
+      final unread = _notifications.where((n) => !(n['isRead'] as bool? ?? false)).length;
+      ref.read(unreadCountProvider.notifier).state = unread;
     } catch (_) {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) setState(() => _loadingNotifs = false);
     }
+  }
+
+  Future<void> _loadConversations() async {
+    setState(() => _loadingConvs = true);
+    try {
+      final api = ref.read(apiClientProvider);
+      final res = await api.get('/chat/conversations');
+      if (!mounted) return;
+      final data = res.data['data'] ?? res.data['items'] ?? res.data;
+      setState(() {
+        _conversations = (data is List ? data : [])
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+        _loadingConvs = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingConvs = false);
+    }
+  }
+
+  Future<void> _markAllRead() async {
+    try {
+      final api = ref.read(apiClientProvider);
+      await api.post('/notifications/read-all');
+      if (!mounted) return;
+      setState(() {
+        _notifications = _notifications.map((n) => {...n, 'isRead': true}).toList();
+      });
+      ref.read(unreadCountProvider.notifier).state = 0;
+    } catch (_) {}
+  }
+
+  Future<void> _markRead(String notifId, int index) async {
+    if (_notifications[index]['isRead'] as bool? ?? false) return;
+    try {
+      final api = ref.read(apiClientProvider);
+      await api.post('/notifications/$notifId/read');
+      if (!mounted) return;
+      setState(() => _notifications[index] = {..._notifications[index], 'isRead': true});
+      final unread = _notifications.where((n) => !(n['isRead'] as bool? ?? false)).length;
+      ref.read(unreadCountProvider.notifier).state = unread;
+    } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.backgroundDark,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
-        title: const Text('Messages', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
-          onPressed: () => context.pop(),
-        ),
+        backgroundColor: AppColors.backgroundDark,
+        elevation: 0,
+        title: const Text('Xabar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.search, color: Colors.white70),
-            onPressed: () {},
-          ),
-        ],
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-          : _conversations.isEmpty
-              ? _buildEmpty()
-              : RefreshIndicator(
-                  color: AppColors.primary,
-                  onRefresh: _load,
-                  child: ListView.separated(
-                    itemCount: _conversations.length,
-                    separatorBuilder: (_, __) => const Divider(color: Colors.white10, indent: 72, height: 1),
-                    itemBuilder: (_, i) => _buildConversationTile(_conversations[i], i),
-                  ),
-                ),
-    );
-  }
-
-  Widget _buildEmpty() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text('💬', style: TextStyle(fontSize: 56)),
-          SizedBox(height: 12),
-          Text('No conversations yet', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-          SizedBox(height: 8),
-          Text('Start chatting with other users', style: TextStyle(color: Colors.white54)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildConversationTile(Map<String, dynamic> conv, int index) {
-    final otherUser = conv['otherUser'] as Map<String, dynamic>? ?? {};
-    final lastMsg = conv['lastMessage'] as Map<String, dynamic>?;
-    final unread = conv['unreadCount'] as int? ?? 0;
-    final displayName = otherUser['displayName'] as String? ?? 'User';
-    final avatar = otherUser['avatar'] as String?;
-    final userId = otherUser['id'] as String? ?? '';
-
-    return InkWell(
-      onTap: () => context.push('/messages/$userId', extra: {
-        'username': displayName,
-        'avatar': avatar,
-      }),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            Stack(
-              children: [
-                CircleAvatar(
-                  radius: 26,
-                  backgroundImage: avatar != null ? NetworkImage(avatar) : null,
-                  backgroundColor: AppColors.surface,
-                  child: avatar == null ? Text(
-                    displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
-                  ) : null,
-                ),
-                if (otherUser['isOnline'] == true)
-                  Positioned(
-                    bottom: 0, right: 0,
-                    child: Container(
-                      width: 12, height: 12,
-                      decoration: BoxDecoration(
-                        color: AppColors.online,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.background, width: 2),
-                      ),
-                    ),
-                  ),
-              ],
+          if (_tab.index == 0 && _notifications.isNotEmpty)
+            TextButton(
+              onPressed: _markAllRead,
+              child: const Text('Barchasini o\'qish', style: TextStyle(color: AppColors.primary, fontSize: 12)),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(displayName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                      ),
-                      if (lastMsg != null)
-                        Text(
-                          _formatTime(lastMsg['createdAt'] as String? ?? ''),
-                          style: const TextStyle(color: Colors.white38, fontSize: 11),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          lastMsg?['content'] as String? ?? 'No messages yet',
-                          style: TextStyle(
-                            color: unread > 0 ? Colors.white70 : Colors.white38,
-                            fontSize: 13,
-                            fontWeight: unread > 0 ? FontWeight.w500 : FontWeight.normal,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (unread > 0)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text('$unread', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
+        ],
+        bottom: TabBar(
+          controller: _tab,
+          indicatorColor: AppColors.primary,
+          indicatorWeight: 2,
+          labelColor: AppColors.primary,
+          unselectedLabelColor: Colors.white38,
+          labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          tabs: const [Tab(text: 'Xabar'), Tab(text: 'Do\'st')],
         ),
       ),
-    ).animate(delay: Duration(milliseconds: index * 30)).fadeIn(duration: 300.ms);
+      body: TabBarView(
+        controller: _tab,
+        children: [
+          _buildNotifTab(),
+          _buildConvTab(),
+        ],
+      ),
+    );
   }
 
-  String _formatTime(String iso) {
-    if (iso.isEmpty) return '';
-    try {
-      final dt = DateTime.parse(iso).toLocal();
-      final now = DateTime.now();
-      final diff = now.difference(dt);
-      if (diff.inMinutes < 1) return 'now';
-      if (diff.inHours < 1) return '${diff.inMinutes}m';
-      if (diff.inDays < 1) return '${diff.inHours}h';
-      if (diff.inDays < 7) return '${diff.inDays}d';
-      return '${dt.day}/${dt.month}';
-    } catch (_) {
-      return '';
-    }
+  Widget _buildNotifTab() {
+    if (_loadingNotifs) return const Center(child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2));
+    return Column(children: [
+      _buildCategoryShortcuts(),
+      Expanded(
+        child: _notifications.isEmpty
+            ? _buildEmpty("Hali yangilik yo'q", Icons.notifications_none)
+            : RefreshIndicator(
+                color: AppColors.primary,
+                onRefresh: _loadNotifications,
+                child: ListView.separated(
+                  itemCount: _notifications.length,
+                  separatorBuilder: (_, __) => const Divider(color: Colors.white10, height: 1),
+                  itemBuilder: (ctx, i) {
+                    final n = _notifications[i];
+                    final isRead = n['isRead'] as bool? ?? false;
+                    return ListTile(
+                      tileColor: isRead ? Colors.transparent : AppColors.primary.withOpacity(0.04),
+                      leading: _notifIcon(n['type'] as String? ?? ''),
+                      title: Text(n['title'] as String? ?? '',
+                          style: TextStyle(color: Colors.white, fontWeight: isRead ? FontWeight.normal : FontWeight.w600, fontSize: 14)),
+                      subtitle: Text(n['body'] as String? ?? '',
+                          style: const TextStyle(color: Colors.white54, fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
+                      trailing: isRead ? null : Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
+                      onTap: () => _markRead(n['id'] as String, i),
+                    ).animate(delay: Duration(milliseconds: i * 25)).fadeIn(duration: 250.ms);
+                  },
+                ),
+              ),
+      ),
+    ]);
+  }
+
+  Widget _buildCategoryShortcuts() {
+    const cats = [
+      {'label': "Do'stlik taklifi", 'icon': '👥'},
+      {'label': 'Sovg\'a', 'icon': '🎁'},
+      {'label': 'VOXO Mukofoti', 'icon': '🏆'},
+      {'label': 'System', 'icon': '⚙️'},
+      {'label': 'Oila', 'icon': '👨‍👩‍👧'},
+    ];
+    return SizedBox(
+      height: 72,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        itemCount: cats.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (ctx, i) => Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Container(
+            width: 40, height: 40,
+            decoration: BoxDecoration(color: Colors.white.withOpacity(0.06), borderRadius: BorderRadius.circular(12)),
+            child: Center(child: Text(cats[i]['icon']!, style: const TextStyle(fontSize: 18))),
+          ),
+          const SizedBox(height: 2),
+          Text(cats[i]['label']!, style: const TextStyle(color: Colors.white38, fontSize: 9)),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildConvTab() {
+    if (_loadingConvs) return const Center(child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2));
+    if (_conversations.isEmpty) return _buildEmpty("Hali xabar yo'q", Icons.chat_bubble_outline);
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: _loadConversations,
+      child: ListView.separated(
+        itemCount: _conversations.length,
+        separatorBuilder: (_, __) => const Divider(color: Colors.white10, indent: 72, height: 1),
+        itemBuilder: (ctx, i) {
+          final conv = _conversations[i];
+          final other = conv['other'] as Map<String, dynamic>? ?? conv['participant'] as Map<String, dynamic>? ?? {};
+          final lastMsg = conv['lastMessage'] as Map<String, dynamic>? ?? {};
+          return ListTile(
+            leading: CircleAvatar(
+              radius: 24,
+              backgroundColor: AppColors.primary.withOpacity(0.3),
+              backgroundImage: other['avatar'] != null ? CachedNetworkImageProvider(other['avatar'] as String) : null,
+              child: other['avatar'] == null ? const Icon(Icons.person, color: Colors.white60) : null,
+            ),
+            title: Text(other['displayName'] as String? ?? 'User',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+            subtitle: Text(lastMsg['content'] as String? ?? '',
+                style: const TextStyle(color: Colors.white54, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+            onTap: () => context.push('/messages/${other['id']}',
+                extra: {'username': other['displayName'], 'avatar': other['avatar']}),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _notifIcon(String type) {
+    final t = type.toLowerCase();
+    String emoji;
+    Color color;
+    if (t.contains('friend') || t.contains('follow')) { emoji = '👥'; color = Colors.blue; }
+    else if (t.contains('gift')) { emoji = '🎁'; color = Colors.orange; }
+    else if (t.contains('reward') || t.contains('bonus')) { emoji = '🏆'; color = Colors.amber; }
+    else if (t.contains('family')) { emoji = '👨‍👩‍👧'; color = Colors.green; }
+    else { emoji = '🔔'; color = Colors.blueGrey; }
+    return Container(
+      width: 40, height: 40,
+      decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(12)),
+      child: Center(child: Text(emoji, style: const TextStyle(fontSize: 18))),
+    );
+  }
+
+  Widget _buildEmpty(String msg, IconData icon) {
+    return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      Icon(icon, color: Colors.white24, size: 60),
+      const SizedBox(height: 12),
+      Text(msg, style: const TextStyle(color: Colors.white38, fontSize: 16)),
+    ]));
   }
 }

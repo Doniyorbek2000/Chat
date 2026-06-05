@@ -3,9 +3,11 @@ import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { WalletModule } from '../wallet/wallet.module';
+import { DiscoverModule } from '../discover/discover.module';
+import { ReferralsModule } from '../referrals/referrals.module';
 
 @Module({
-  imports: [PrismaModule, WalletModule],
+  imports: [PrismaModule, WalletModule, DiscoverModule, ReferralsModule],
   controllers: [AdminController],
   providers: [AdminService],
 })

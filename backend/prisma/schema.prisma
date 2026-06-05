@@ -27,6 +27,12 @@ enum TransactionType {
   NAMEPLATE_PURCHASE
 }
 
+enum ModerationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum NobleTier {
   PRINCE
   NOBLE
@@ -307,6 +313,16 @@ model User {
   shopPurchases        ShopPurchase[]
   roomThemes           UserRoomTheme[]
   nameplates           UserNameplate[]
+  discoverPosts        DiscoverPost[]
+  discoverLikes        DiscoverPostLike[]
+  discoverComments     DiscoverPostComment[]
+  discoverGifts        DiscoverPostGift[]
+  discoverReports      DiscoverPostReport[]
+  myReferralCode       ReferralCode?
+  referrerRelations    ReferralRelation[]    @relation("ReferrerRelations")
+  refereeRelation      ReferralRelation?     @relation("RefereeRelation")
+  referralRewards      ReferralReward[]
+  referralPayouts      ReferralPayout[]
 
   @@index([phone])
   @@index([email])
@@ -494,6 +510,7 @@ model Gift {
   transactions   GiftTransaction[]
   luckyConfig    LuckyGiftConfig?
   luckyRounds    LuckyGiftRound[]
+  discoverGifts  DiscoverPostGift[]
 
   @@index([category])
   @@index([isActive])
@@ -709,6 +726,7 @@ model Notification {
   data      Json?
   isRead    Boolean   @default(false)
   readAt    DateTime?
+  category  String?
   createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1483,6 +1501,7 @@ model UserNameplate {
   purchasedAt  DateTime  @default(now())
   expiresAt    DateTime?
   isEquipped   Boolean   @default(false)
+  equippedSlot Int?
 
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   nameplate Nameplate @relation(fields: [nameplateId], references: [id])
@@ -1490,4 +1509,196 @@ model UserNameplate {
   @@unique([userId, nameplateId])
   @@index([userId])
   @@map("user_nameplates")
+}
+
+// ==================== DISCOVER / POSTS ====================
+
+model DiscoverPost {
+  id               String              @id @default(cuid())
+  authorId         String
+  text             String              @db.Text
+  country          String?
+  moderationStatus ModerationStatus    @default(APPROVED)
+  reportCount      Int                 @default(0)
+  likeCount        Int                 @default(0)
+  commentCount     Int                 @default(0)
+  isHidden         Boolean             @default(false)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  author   User                 @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  images   DiscoverPostImage[]
+  likes    DiscoverPostLike[]
+  comments DiscoverPostComment[]
+  gifts    DiscoverPostGift[]
+  reports  DiscoverPostReport[]
+
+  @@index([authorId])
+  @@index([moderationStatus])
+  @@index([country])
+  @@index([createdAt])
+  @@map("discover_posts")
+}
+
+model DiscoverPostImage {
+  id       String @id @default(cuid())
+  postId   String
+  url      String
+  sortOrder Int   @default(0)
+
+  post DiscoverPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@map("discover_post_images")
+}
+
+model DiscoverPostLike {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post DiscoverPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([postId])
+  @@map("discover_post_likes")
+}
+
+model DiscoverPostComment {
+  id        String   @id @default(cuid())
+  postId    String
+  authorId  String
+  text      String
+  createdAt DateTime @default(now())
+
+  post   DiscoverPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@map("discover_post_comments")
+}
+
+model DiscoverPostGift {
+  id        String   @id @default(cuid())
+  postId    String
+  senderId  String
+  giftId    String
+  amount    Int      @default(1)
+  createdAt DateTime @default(now())
+
+  post   DiscoverPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  sender User         @relation(fields: [senderId], references: [id])
+  gift   Gift         @relation(fields: [giftId], references: [id])
+
+  @@index([postId])
+  @@map("discover_post_gifts")
+}
+
+model DiscoverPostReport {
+  id         String    @id @default(cuid())
+  postId     String
+  reporterId String
+  reason     String
+  isResolved Boolean   @default(false)
+  resolvedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  post     DiscoverPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  reporter User         @relation(fields: [reporterId], references: [id])
+
+  @@unique([postId, reporterId])
+  @@index([postId])
+  @@map("discover_post_reports")
+}
+
+// ==================== REFERRAL ====================
+
+model ReferralCode {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  code      String   @unique
+  usedCount Int      @default(0)
+  createdAt DateTime @default(now())
+
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  referrals ReferralRelation[] @relation("ReferrerCode")
+
+  @@index([code])
+  @@map("referral_codes")
+}
+
+model ReferralRelation {
+  id           String   @id @default(cuid())
+  referrerId   String
+  refereeId    String   @unique
+  codeId       String
+  deviceInfo   String?
+  ipHash       String?
+  isSuspicious Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  referrer User         @relation("ReferrerRelations", fields: [referrerId], references: [id])
+  referee  User         @relation("RefereeRelation", fields: [refereeId], references: [id])
+  code     ReferralCode @relation("ReferrerCode", fields: [codeId], references: [id])
+  rewards  ReferralReward[]
+
+  @@index([referrerId])
+  @@map("referral_relations")
+}
+
+model ReferralReward {
+  id         String    @id @default(cuid())
+  relationId String
+  userId     String
+  coins      Int
+  reason     String
+  isPaid     Boolean   @default(false)
+  paidAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  relation ReferralRelation @relation(fields: [relationId], references: [id])
+  user     User             @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([relationId])
+  @@map("referral_rewards")
+}
+
+model ReferralRebateRule {
+  id             String   @id @default(cuid())
+  level          Int      @unique
+  rebatePercent  Float
+  minRechargeUSD Float    @default(0)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  @@map("referral_rebate_rules")
+}
+
+model ReferralPayout {
+  id          String   @id @default(cuid())
+  userId      String
+  coins       Int
+  description String
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("referral_payouts")
+}
+
+// ==================== NOTIFICATION CATEGORIES ====================
+
+model NotificationCategory {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  label     String
+  icon      String?
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@map("notification_categories")
 }

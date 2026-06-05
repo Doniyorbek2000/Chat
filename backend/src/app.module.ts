@@ -33,6 +33,9 @@ import { ShopModule } from './modules/shop/shop.module';
 import { NameplatesModule } from './modules/nameplates/nameplates.module';
 import { RoomThemesModule } from './modules/room-themes/room-themes.module';
 import { CollectionModule } from './modules/collection/collection.module';
+import { DiscoverModule } from './modules/discover/discover.module';
+import { ReferralsModule } from './modules/referrals/referrals.module';
+import { HomeModule } from './modules/home/home.module';
 
 @Module({
   imports: [
@@ -95,6 +98,9 @@ import { CollectionModule } from './modules/collection/collection.module';
     NameplatesModule,
     RoomThemesModule,
     CollectionModule,
+    DiscoverModule,
+    ReferralsModule,
+    HomeModule,
   ],
 })
 export class AppModule {}

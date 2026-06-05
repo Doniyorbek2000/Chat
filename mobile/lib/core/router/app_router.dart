@@ -33,6 +33,9 @@ import '../../features/shop/presentation/screens/shop_screen.dart';
 import '../../features/medals/presentation/screens/medal_screen.dart';
 import '../../features/collection/presentation/screens/collection_screen.dart';
 import '../../features/nameplate/presentation/screens/nameplate_screen.dart';
+import '../../features/referral/presentation/screens/referral_screen.dart';
+import '../../features/home/presentation/screens/search_screen.dart';
+import '../../features/home/presentation/screens/create_post_screen.dart';
 import '../providers/auth_provider.dart';
 
 class AppRoutes {
@@ -71,6 +74,9 @@ class AppRoutes {
   static const String medals = '/medals';
   static const String collection = '/collection';
   static const String nameplate = '/nameplate';
+  static const String referral = '/referral';
+  static const String search = '/search';
+  static const String createPost = '/create-post';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -351,6 +357,18 @@ final routerProvider = Provider<GoRouter>((ref) {
           state,
           const NameplateScreen(),
         ),
+      ),
+      GoRoute(
+        path: AppRoutes.referral,
+        pageBuilder: (context, state) => _buildPage(state, const ReferralScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.search,
+        pageBuilder: (context, state) => _buildPage(state, const SearchScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.createPost,
+        pageBuilder: (context, state) => _buildPage(state, const CreatePostScreen()),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

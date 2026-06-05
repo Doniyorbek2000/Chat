@@ -31,6 +31,8 @@ import {
   TrophyIcon,
   SwatchIcon,
   IdentificationIcon,
+  GlobeAltIcon,
+  UserPlusIcon,
 } from '@heroicons/react/24/outline'
 
 interface NavItem {
@@ -127,6 +129,18 @@ const navItems: NavItem[] = [
     label: 'Banners',
     href: '/banners',
     icon: PhotoIcon,
+  },
+  {
+    label: 'Discover',
+    href: '/discover',
+    icon: GlobeAltIcon,
+    requiredRole: 'moderator',
+  },
+  {
+    label: 'Referrals',
+    href: '/referrals',
+    icon: UserPlusIcon,
+    requiredRole: 'admin',
   },
   {
     label: 'Reports',
