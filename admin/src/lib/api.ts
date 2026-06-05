@@ -544,6 +544,54 @@ class ApiClient {
     return this.request({ url: `/admin/referrals/rules/${id}`, method: 'PATCH', data })
   }
 
+  // ============ SUPPORT / POLICIES ============
+  async adminGetPolicies(): Promise<any> {
+    return this.request({ url: '/support/admin/policies', method: 'GET' })
+  }
+
+  async adminCreatePolicy(data: Record<string, any>): Promise<any> {
+    return this.request({ url: '/support/admin/policies', method: 'POST', data })
+  }
+
+  async adminUpdatePolicy(id: string, data: Record<string, any>): Promise<any> {
+    return this.request({ url: `/support/admin/policies/${id}`, method: 'PATCH', data })
+  }
+
+  async adminPublishPolicy(id: string): Promise<any> {
+    return this.request({ url: `/support/admin/policies/${id}/publish`, method: 'POST', data: {} })
+  }
+
+  async adminUnpublishPolicy(id: string): Promise<any> {
+    return this.request({ url: `/support/admin/policies/${id}/unpublish`, method: 'POST', data: {} })
+  }
+
+  async adminDeletePolicy(id: string): Promise<any> {
+    return this.request({ url: `/support/admin/policies/${id}`, method: 'DELETE' })
+  }
+
+  // ============ SUPPORT TICKETS ============
+  async adminGetTickets(params?: Record<string, any>): Promise<any> {
+    return this.request({ url: '/support/admin/tickets', method: 'GET', params })
+  }
+
+  async adminUpdateTicket(id: string, data: Record<string, any>): Promise<any> {
+    return this.request({ url: `/support/admin/tickets/${id}`, method: 'PATCH', data })
+  }
+
+  async adminReplyTicket(id: string, body: string): Promise<any> {
+    return this.request({ url: `/support/admin/tickets/${id}/reply`, method: 'POST', data: { body } })
+  }
+
+  // ============ SUPPORT LOGS ============
+  async adminGetLogs(params?: Record<string, any>): Promise<any> {
+    return this.request({ url: '/support/admin/logs', method: 'GET', params })
+  }
+
+  // ============ DELETION REQUESTS ============
+  async adminGetDeletionRequests(params?: Record<string, any>): Promise<any> {
+    return this.request({ url: '/support/admin/deletion-requests', method: 'GET', params })
+  }
+
   // ============ NOTIFICATION CATEGORIES ============
   async getNotificationCategories(): Promise<any> {
     return this.request({ url: '/admin/notifications/categories', method: 'GET' })

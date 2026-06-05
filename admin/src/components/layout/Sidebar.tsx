@@ -33,6 +33,9 @@ import {
   IdentificationIcon,
   GlobeAltIcon,
   UserPlusIcon,
+  DocumentTextIcon,
+  ChatBubbleLeftEllipsisIcon,
+  UserMinusIcon,
 } from '@heroicons/react/24/outline'
 
 interface NavItem {
@@ -157,6 +160,24 @@ const navItems: NavItem[] = [
     label: 'Revenue',
     href: '/revenue',
     icon: CurrencyDollarIcon,
+    requiredRole: 'admin',
+  },
+  {
+    label: 'Siyosatlar',
+    href: '/policies',
+    icon: DocumentTextIcon,
+    requiredRole: 'admin',
+  },
+  {
+    label: "Qo'llab-quvvatlash",
+    href: '/support',
+    icon: ChatBubbleLeftEllipsisIcon,
+    requiredRole: 'moderator',
+  },
+  {
+    label: "Hisob o'chirish",
+    href: '/deletions',
+    icon: UserMinusIcon,
     requiredRole: 'admin',
   },
   {
