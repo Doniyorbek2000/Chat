@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeftIcon,
@@ -9,103 +9,157 @@ import {
   CheckCircleIcon,
   TrashIcon,
   WalletIcon,
-  MicrophoneIcon,
-  ShieldExclamationIcon,
-  ClockIcon,
-  StarIcon,
   GiftIcon,
 } from '@heroicons/react/24/outline'
 import Avatar from '@/components/ui/Avatar'
 import Badge, { VIPBadge } from '@/components/ui/Badge'
 import Modal, { ConfirmModal } from '@/components/ui/Modal'
+import { api } from '@/lib/api'
 import { formatDate, formatDateTime, formatNumber, timeAgo } from '@/lib/utils'
 import type { User, WalletTransaction, UserBan } from '@/types'
 import toast from 'react-hot-toast'
 
-// Mock user data
-const mockUser: User = {
-  id: 'user-1',
-  uid: 'U10001',
-  username: 'johndoe',
-  displayName: 'John Doe',
-  email: 'john@example.com',
-  phone: '+15551234567',
-  bio: 'Music lover, voice chat enthusiast 🎵',
-  gender: 'male',
-  birthday: '1995-06-15',
-  country: 'US',
-  level: 45,
-  exp: 89500,
-  vipLevel: 5,
-  vipExpiry: new Date(Date.now() + 30 * 86400000).toISOString(),
-  coins: 15420,
-  diamonds: 8320,
-  status: 'active',
-  isOnline: true,
-  lastSeen: new Date().toISOString(),
-  createdAt: '2022-03-15T10:30:00Z',
-  updatedAt: new Date().toISOString(),
-  totalRecharged: 1250,
-  totalWithdrawn: 320,
-  followersCount: 12400,
-  followingCount: 345,
-  totalGiftsSent: 45230,
-  totalGiftsReceived: 28100,
-}
-
-const mockTransactions: WalletTransaction[] = Array.from({ length: 20 }, (_, i) => ({
-  id: `tx-${i}`,
-  userId: 'user-1',
-  type: ['recharge', 'gift_sent', 'gift_received', 'vip_purchase'][Math.floor(Math.random() * 4)] as never,
-  amount: Math.floor(Math.random() * 500) + 10,
-  currency: 'diamonds' as const,
-  description: ['Coin recharge $9.99', 'Gift: Rose', 'Gift received: Rocket', 'VIP Level 3 purchase'][Math.floor(Math.random() * 4)],
-  balanceBefore: 8000 + i * 100,
-  balanceAfter: 8500 + i * 100,
-  status: 'completed' as const,
-  createdAt: new Date(Date.now() - i * 86400000 * 2).toISOString(),
-}))
-
-const mockBans: UserBan[] = [
-  {
-    id: 'ban-1',
-    userId: 'user-1',
-    adminId: 'admin-1',
-    reason: 'Violation of community guidelines - spamming',
-    duration: 24,
-    expiresAt: new Date(Date.now() + 3600000).toISOString(),
-    createdAt: new Date(Date.now() - 10 * 3600000).toISOString(),
-    isActive: false,
-  },
-]
-
 const TABS = ['Overview', 'Wallet', 'Transactions', 'Rooms', 'Reports', 'Bans']
 
 export default function UserDetailPage() {
-  const params = useParams()
+  const params = useParams() as { id: string }
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [activeTab, setActiveTab] = useState(searchParams.get('edit') ? 'Overview' : 'Overview')
+  const [activeTab, setActiveTab] = useState('Overview')
   const [isEditing, setIsEditing] = useState(!!searchParams.get('edit'))
   const [confirmBan, setConfirmBan] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [banModal, setBanModal] = useState(false)
   const [banReason, setBanReason] = useState('')
   const [banDuration, setBanDuration] = useState('24')
-  const [editData, setEditData] = useState({ ...mockUser })
+  const [actionLoading, setActionLoading] = useState(false)
 
-  const user = mockUser // In production: use useUser(params.id as string)
+  const [user, setUser] = useState<any>(null)
+  const [transactions, setTransactions] = useState<any[]>([])
+  const [bans, setBans] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [editData, setEditData] = useState<any>({})
+
+  useEffect(() => {
+    Promise.allSettled([
+      api.getUser(params.id),
+      api.getUserTransactions(params.id),
+      api.getUserBans(params.id),
+    ]).then(([u, tx, b]) => {
+      if (u.status === 'fulfilled') {
+        setUser(u.value)
+        setEditData({ ...(u.value as any) })
+      }
+      if (tx.status === 'fulfilled') setTransactions((tx.value as any)?.data ?? [])
+      if (b.status === 'fulfilled') setBans(Array.isArray(b.value) ? b.value : [])
+      setLoading(false)
+    })
+  }, [params.id])
 
   const handleBan = async () => {
     if (!banReason) { toast.error('Please provide a reason'); return }
-    toast.success(`User ${user.displayName} has been banned for ${banDuration}h`)
-    setBanModal(false)
-    setBanReason('')
+    setActionLoading(true)
+    try {
+      await api.banUser(params.id, { reason: banReason, duration: banDuration ? Number(banDuration) : undefined })
+      toast.success(`User ${user?.displayName} has been banned for ${banDuration || 'permanent'}`)
+      setBanModal(false)
+      setBanReason('')
+      // Reload user and bans
+      const [u, b] = await Promise.allSettled([api.getUser(params.id), api.getUserBans(params.id)])
+      if (u.status === 'fulfilled') { setUser(u.value); setEditData({ ...(u.value as any) }) }
+      if (b.status === 'fulfilled') setBans(Array.isArray(b.value) ? b.value : [])
+    } catch {
+      toast.error('Failed to ban user')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleUnban = async () => {
+    setActionLoading(true)
+    try {
+      await api.unbanUser(params.id)
+      toast.success(`User ${user?.displayName} has been unbanned`)
+      const [u, b] = await Promise.allSettled([api.getUser(params.id), api.getUserBans(params.id)])
+      if (u.status === 'fulfilled') { setUser(u.value); setEditData({ ...(u.value as any) }) }
+      if (b.status === 'fulfilled') setBans(Array.isArray(b.value) ? b.value : [])
+    } catch {
+      toast.error('Failed to unban user')
+    } finally {
+      setActionLoading(false)
+    }
   }
 
   const handleSave = async () => {
-    toast.success('User updated successfully')
-    setIsEditing(false)
+    setActionLoading(true)
+    try {
+      const updated = await api.updateUser(params.id, {
+        displayName: editData.displayName,
+        bio: editData.bio,
+        username: editData.username,
+        email: editData.email,
+        phone: editData.phone,
+        vipLevel: editData.vipLevel,
+        status: editData.status,
+      })
+      setUser(updated)
+      setEditData({ ...updated })
+      toast.success('User updated successfully')
+      setIsEditing(false)
+    } catch {
+      toast.error('Failed to update user')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    setActionLoading(true)
+    try {
+      await api.deleteUser(params.id)
+      toast.success('User deleted')
+      router.push('/users')
+    } catch {
+      toast.error('Failed to delete user')
+      setActionLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="h-6 bg-white/10 rounded w-32 animate-pulse" />
+        <div className="card animate-pulse">
+          <div className="flex gap-6">
+            <div className="w-20 h-20 bg-white/10 rounded-full" />
+            <div className="flex-1 space-y-3">
+              <div className="h-6 bg-white/10 rounded w-48" />
+              <div className="h-4 bg-white/10 rounded w-32" />
+              <div className="grid grid-cols-4 gap-4 mt-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="h-16 bg-white/10 rounded-lg" />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="card animate-pulse h-48" />
+          <div className="card animate-pulse h-48" />
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="text-center py-16">
+        <p className="text-dark-400">User not found</p>
+        <button onClick={() => router.push('/users')} className="btn-secondary mt-4">
+          Back to Users
+        </button>
+      </div>
+    )
   }
 
   return (
@@ -136,7 +190,7 @@ export default function UserDetailPage() {
             <div className="flex flex-wrap items-start gap-3 mb-3">
               <div>
                 <h2 className="text-2xl font-bold text-white">{user.displayName}</h2>
-                <p className="text-dark-400">@{user.username} • {user.uid}</p>
+                <p className="text-dark-400">@{user.username} &bull; {user.uid}</p>
               </div>
               <div className="flex gap-2 flex-wrap">
                 <Badge status={user.status} />
@@ -178,7 +232,7 @@ export default function UserDetailPage() {
               {isEditing ? 'Cancel Edit' : 'Edit User'}
             </button>
             {user.status === 'banned' ? (
-              <button className="btn-primary text-sm">
+              <button onClick={handleUnban} disabled={actionLoading} className="btn-primary text-sm">
                 <CheckCircleIcon className="w-4 h-4" />
                 Unban User
               </button>
@@ -209,7 +263,7 @@ export default function UserDetailPage() {
             { label: 'Country', value: user.country || '—' },
             { label: 'Joined', value: formatDate(user.createdAt) },
             { label: 'Last Seen', value: user.lastSeen ? timeAgo(user.lastSeen) : '—' },
-            { label: 'Total Recharged', value: `$${user.totalRecharged}` },
+            { label: 'Total Recharged', value: `$${user.totalRecharged ?? 0}` },
             { label: 'VIP Expiry', value: user.vipExpiry ? formatDate(user.vipExpiry) : '—' },
             { label: 'Birthday', value: user.birthday ? formatDate(user.birthday) : '—' },
           ].map((item) => (
@@ -249,7 +303,7 @@ export default function UserDetailPage() {
                 <div>
                   <label className="label">Display Name</label>
                   <input
-                    value={editData.displayName}
+                    value={editData.displayName ?? ''}
                     onChange={(e) => setEditData({ ...editData, displayName: e.target.value })}
                     className="input"
                   />
@@ -257,7 +311,7 @@ export default function UserDetailPage() {
                 <div>
                   <label className="label">Username</label>
                   <input
-                    value={editData.username}
+                    value={editData.username ?? ''}
                     onChange={(e) => setEditData({ ...editData, username: e.target.value })}
                     className="input"
                   />
@@ -265,7 +319,7 @@ export default function UserDetailPage() {
                 <div>
                   <label className="label">Email</label>
                   <input
-                    value={editData.email || ''}
+                    value={editData.email ?? ''}
                     onChange={(e) => setEditData({ ...editData, email: e.target.value })}
                     type="email"
                     className="input"
@@ -274,7 +328,7 @@ export default function UserDetailPage() {
                 <div>
                   <label className="label">Phone</label>
                   <input
-                    value={editData.phone || ''}
+                    value={editData.phone ?? ''}
                     onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
                     className="input"
                   />
@@ -282,7 +336,7 @@ export default function UserDetailPage() {
                 <div>
                   <label className="label">VIP Level</label>
                   <select
-                    value={editData.vipLevel}
+                    value={editData.vipLevel ?? 0}
                     onChange={(e) => setEditData({ ...editData, vipLevel: Number(e.target.value) })}
                     className="input"
                   >
@@ -294,7 +348,7 @@ export default function UserDetailPage() {
                 <div>
                   <label className="label">Status</label>
                   <select
-                    value={editData.status}
+                    value={editData.status ?? 'active'}
                     onChange={(e) => setEditData({ ...editData, status: e.target.value as User['status'] })}
                     className="input"
                   >
@@ -306,7 +360,7 @@ export default function UserDetailPage() {
                 <div className="sm:col-span-2">
                   <label className="label">Bio</label>
                   <textarea
-                    value={editData.bio || ''}
+                    value={editData.bio ?? ''}
                     onChange={(e) => setEditData({ ...editData, bio: e.target.value })}
                     rows={3}
                     className="input resize-none"
@@ -315,7 +369,9 @@ export default function UserDetailPage() {
               </div>
               <div className="flex justify-end gap-3 mt-4">
                 <button onClick={() => setIsEditing(false)} className="btn-secondary">Cancel</button>
-                <button onClick={handleSave} className="btn-primary">Save Changes</button>
+                <button onClick={handleSave} disabled={actionLoading} className="btn-primary">
+                  {actionLoading ? 'Saving...' : 'Save Changes'}
+                </button>
               </div>
             </div>
           ) : (
@@ -349,8 +405,8 @@ export default function UserDetailPage() {
                   {[
                     { label: 'Current Coins', value: formatNumber(user.coins) + ' 🪙', color: 'text-yellow-400' },
                     { label: 'Current Diamonds', value: formatNumber(user.diamonds) + ' 💎', color: 'text-blue-400' },
-                    { label: 'Total Recharged', value: '$' + user.totalRecharged, color: 'text-green-400' },
-                    { label: 'Total Withdrawn', value: '$' + user.totalWithdrawn, color: 'text-red-400' },
+                    { label: 'Total Recharged', value: '$' + (user.totalRecharged ?? 0), color: 'text-green-400' },
+                    { label: 'Total Withdrawn', value: '$' + (user.totalWithdrawn ?? 0), color: 'text-red-400' },
                   ].map((item) => (
                     <div key={item.label} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
                       <span className="text-dark-300 text-sm">{item.label}</span>
@@ -367,49 +423,53 @@ export default function UserDetailPage() {
       {activeTab === 'Transactions' && (
         <div className="card animate-fade-in">
           <h3 className="text-white font-semibold mb-4">Transaction History</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-white/5">
-                  {['Date', 'Type', 'Description', 'Amount', 'Balance', 'Status'].map((h) => (
-                    <th key={h} className="table-header px-4 py-3 text-left">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {mockTransactions.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-white/2 transition-colors">
-                    <td className="table-cell text-dark-400">{formatDateTime(tx.createdAt)}</td>
-                    <td className="table-cell">
-                      <span className="capitalize text-dark-200">{tx.type.replace('_', ' ')}</span>
-                    </td>
-                    <td className="table-cell text-dark-300">{tx.description}</td>
-                    <td className="table-cell">
-                      <span className={`font-semibold ${
-                        tx.type === 'gift_sent' || tx.type === 'withdrawal' ? 'text-red-400' : 'text-green-400'
-                      }`}>
-                        {tx.type === 'gift_sent' || tx.type === 'withdrawal' ? '-' : '+'}
-                        {tx.amount} 💎
-                      </span>
-                    </td>
-                    <td className="table-cell text-dark-400">{tx.balanceAfter} 💎</td>
-                    <td className="table-cell"><Badge status={tx.status} size="sm" /></td>
+          {transactions.length === 0 ? (
+            <p className="text-dark-400 text-center py-8">No transactions found</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-white/5">
+                    {['Date', 'Type', 'Description', 'Amount', 'Balance', 'Status'].map((h) => (
+                      <th key={h} className="table-header px-4 py-3 text-left">{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {transactions.map((tx: any) => (
+                    <tr key={tx.id} className="hover:bg-white/2 transition-colors">
+                      <td className="table-cell text-dark-400">{formatDateTime(tx.createdAt)}</td>
+                      <td className="table-cell">
+                        <span className="capitalize text-dark-200">{tx.type?.replace('_', ' ')}</span>
+                      </td>
+                      <td className="table-cell text-dark-300">{tx.description}</td>
+                      <td className="table-cell">
+                        <span className={`font-semibold ${
+                          tx.type === 'gift_sent' || tx.type === 'withdrawal' ? 'text-red-400' : 'text-green-400'
+                        }`}>
+                          {tx.type === 'gift_sent' || tx.type === 'withdrawal' ? '-' : '+'}
+                          {tx.amount} 💎
+                        </span>
+                      </td>
+                      <td className="table-cell text-dark-400">{tx.balanceAfter} 💎</td>
+                      <td className="table-cell"><Badge status={tx.status} size="sm" /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
       {activeTab === 'Bans' && (
         <div className="card animate-fade-in">
           <h3 className="text-white font-semibold mb-4">Ban History</h3>
-          {mockBans.length === 0 ? (
+          {bans.length === 0 ? (
             <p className="text-dark-400 text-center py-8">No bans recorded</p>
           ) : (
             <div className="space-y-3">
-              {mockBans.map((ban) => (
+              {bans.map((ban: any) => (
                 <div key={ban.id} className="p-4 bg-white/3 rounded-xl border border-white/5">
                   <div className="flex items-start justify-between">
                     <div>
@@ -465,7 +525,9 @@ export default function UserDetailPage() {
           </div>
           <div className="flex gap-3 justify-end">
             <button onClick={() => setBanModal(false)} className="btn-secondary">Cancel</button>
-            <button onClick={handleBan} className="btn-danger">Ban User</button>
+            <button onClick={handleBan} disabled={actionLoading} className="btn-danger">
+              {actionLoading ? 'Banning...' : 'Ban User'}
+            </button>
           </div>
         </div>
       </Modal>
@@ -473,10 +535,11 @@ export default function UserDetailPage() {
       <ConfirmModal
         open={confirmDelete}
         onClose={() => setConfirmDelete(false)}
-        onConfirm={() => { toast.success('User deleted'); router.push('/users') }}
+        onConfirm={handleDelete}
         title="Delete User Account"
         message="This will permanently delete all user data including messages, gifts, transactions. This cannot be undone."
         confirmLabel="Delete Account"
+        loading={actionLoading}
       />
     </div>
   )

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createColumnHelper } from '@tanstack/react-table'
 import {
@@ -17,7 +17,6 @@ import DataTable from '@/components/ui/DataTable'
 import Avatar from '@/components/ui/Avatar'
 import Badge, { VIPBadge } from '@/components/ui/Badge'
 import { ConfirmModal } from '@/components/ui/Modal'
-import { useUsers } from '@/hooks/useUsers'
 import { api } from '@/lib/api'
 import { formatDate, formatNumber, downloadBlob } from '@/lib/utils'
 import type { User } from '@/types'
@@ -25,39 +24,14 @@ import toast from 'react-hot-toast'
 
 const columnHelper = createColumnHelper<User>()
 
-const mockUsers: User[] = Array.from({ length: 50 }, (_, i) => ({
-  id: `user-${i}`,
-  uid: `U${10000 + i}`,
-  username: `user${i}`,
-  displayName: `User ${i}`,
-  email: `user${i}@example.com`,
-  phone: `+1555${String(i).padStart(7, '0')}`,
-  avatar: undefined,
-  level: Math.floor(Math.random() * 100) + 1,
-  exp: Math.floor(Math.random() * 100000),
-  vipLevel: Math.floor(Math.random() * 11),
-  coins: Math.floor(Math.random() * 100000),
-  diamonds: Math.floor(Math.random() * 50000),
-  status: ['active', 'banned', 'active', 'active', 'suspended'][Math.floor(Math.random() * 5)] as User['status'],
-  isOnline: Math.random() > 0.7,
-  lastSeen: new Date(Date.now() - Math.random() * 86400000 * 7).toISOString(),
-  createdAt: new Date(Date.now() - Math.random() * 86400000 * 365).toISOString(),
-  updatedAt: new Date().toISOString(),
-  totalRecharged: Math.floor(Math.random() * 5000),
-  totalWithdrawn: Math.floor(Math.random() * 1000),
-  followersCount: Math.floor(Math.random() * 10000),
-  followingCount: Math.floor(Math.random() * 500),
-  totalGiftsSent: Math.floor(Math.random() * 10000),
-  totalGiftsReceived: Math.floor(Math.random() * 5000),
-  country: ['US', 'UK', 'CA', 'AU', 'SA', 'AE'][Math.floor(Math.random() * 6)],
-}))
-
 export default function UsersPage() {
   const router = useRouter()
+  const [users, setUsers] = useState<any[]>([])
+  const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
-  const [search, setSearch] = useState('')
   const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [vipFilter, setVipFilter] = useState('')
   const [selectedUsers, setSelectedUsers] = useState<User[]>([])
@@ -65,24 +39,31 @@ export default function UsersPage() {
   const [confirmDelete, setConfirmDelete] = useState<User | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const searchTimer = useRef<any>()
 
-  // In production: use useUsers hook
-  // const { users, total, isLoading } = useUsers({ page, limit: pageSize, search, status: statusFilter })
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await api.getUsers({ search, status: statusFilter || undefined, page, limit: pageSize })
+      const items = (res as any)?.data ?? (Array.isArray(res) ? res : [])
+      const tot = (res as any)?.total ?? items.length
+      setUsers(items)
+      setTotal(tot)
+    } catch (e) {
+      toast.error('Failed to load users')
+    } finally {
+      setLoading(false)
+    }
+  }, [search, statusFilter, page, pageSize])
 
-  const filteredUsers = mockUsers.filter((u) => {
-    const matchSearch = !search || u.displayName.toLowerCase().includes(search.toLowerCase()) ||
-      u.username.toLowerCase().includes(search.toLowerCase()) || u.uid.includes(search)
-    const matchStatus = !statusFilter || u.status === statusFilter
-    const matchVip = !vipFilter || u.vipLevel.toString() === vipFilter
-    return matchSearch && matchStatus && matchVip
-  })
+  useEffect(() => { load() }, [load])
 
-  const paginatedUsers = filteredUsers.slice((page - 1) * pageSize, page * pageSize)
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    setSearch(searchInput)
-    setPage(1)
+  // Debounce search
+  const handleSearchChange = (val: string) => {
+    setSearchInput(val)
+    clearTimeout(searchTimer.current)
+    searchTimer.current = setTimeout(() => { setSearch(val); setPage(1) }, 300)
   }
 
   const handleBan = async (user: User) => {
@@ -91,6 +72,7 @@ export default function UsersPage() {
       await api.banUser(user.id, { reason: 'Admin action', duration: undefined })
       toast.success(`User ${user.displayName} has been banned`)
       setConfirmBan(null)
+      load()
     } catch {
       toast.error('Failed to ban user')
     } finally {
@@ -102,6 +84,7 @@ export default function UsersPage() {
     try {
       await api.unbanUser(user.id)
       toast.success(`User ${user.displayName} has been unbanned`)
+      load()
     } catch {
       toast.error('Failed to unban user')
     }
@@ -113,6 +96,7 @@ export default function UsersPage() {
       await api.deleteUser(user.id)
       toast.success('User deleted')
       setConfirmDelete(null)
+      load()
     } catch {
       toast.error('Failed to delete user')
     } finally {
@@ -281,16 +265,16 @@ export default function UsersPage() {
     <div className="space-y-5 animate-fade-in">
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <form onSubmit={handleSearch} className="flex-1 relative">
+        <div className="flex-1 relative">
           <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
           <input
             type="text"
             placeholder="Search by name, username, UID..."
             value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="input pl-10 pr-4"
           />
-        </form>
+        </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowFilters(!showFilters)}
@@ -389,30 +373,39 @@ export default function UsersPage() {
 
       {/* Summary stats */}
       <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: 'Total', value: filteredUsers.length, color: 'text-white' },
-          { label: 'Active', value: filteredUsers.filter(u => u.status === 'active').length, color: 'text-green-400' },
-          { label: 'Banned', value: filteredUsers.filter(u => u.status === 'banned').length, color: 'text-red-400' },
-        ].map((stat) => (
-          <div key={stat.label} className="card py-3 text-center">
-            <p className={`text-xl font-bold ${stat.color}`}>{stat.value}</p>
-            <p className="text-dark-500 text-xs mt-0.5">{stat.label}</p>
-          </div>
-        ))}
+        {loading ? (
+          [1, 2, 3].map((i) => (
+            <div key={i} className="card py-3 text-center animate-pulse">
+              <div className="h-6 bg-white/10 rounded w-12 mx-auto mb-1" />
+              <div className="h-3 bg-white/10 rounded w-16 mx-auto" />
+            </div>
+          ))
+        ) : (
+          [
+            { label: 'Total', value: total, color: 'text-white' },
+            { label: 'Active', value: users.filter((u: any) => u.status === 'active').length, color: 'text-green-400' },
+            { label: 'Banned', value: users.filter((u: any) => u.status === 'banned').length, color: 'text-red-400' },
+          ].map((stat) => (
+            <div key={stat.label} className="card py-3 text-center">
+              <p className={`text-xl font-bold ${stat.color}`}>{stat.value}</p>
+              <p className="text-dark-500 text-xs mt-0.5">{stat.label}</p>
+            </div>
+          ))
+        )}
       </div>
 
       {/* Table */}
       <div className="card p-0 overflow-hidden">
         <DataTable
-          data={paginatedUsers}
+          data={users}
           columns={columns}
-          total={filteredUsers.length}
+          total={total}
           page={page}
           pageSize={pageSize}
           onPageChange={setPage}
           onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
           onSelectionChange={setSelectedUsers}
-          emptyMessage="No users found matching your criteria"
+          emptyMessage={loading ? 'Loading users...' : 'No users found matching your criteria'}
           className="p-4"
         />
       </div>
