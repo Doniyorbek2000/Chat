@@ -608,6 +608,116 @@ class ApiClient {
   async deleteNotificationCategory(id: string): Promise<void> {
     return this.request({ url: `/admin/notifications/categories/${id}`, method: 'DELETE' })
   }
+
+  // ============ GROWTH DASHBOARD ============
+  async getGrowthSummary(from?: string, to?: string): Promise<any> {
+    return this.request({ url: '/admin/growth/summary', method: 'GET', params: { from, to } })
+  }
+
+  async getGrowthRetention(): Promise<any> {
+    return this.request({ url: '/admin/growth/retention', method: 'GET' })
+  }
+
+  async getGrowthRevenueChart(from?: string, to?: string, groupBy = 'day'): Promise<any> {
+    return this.request({ url: '/admin/growth/revenue', method: 'GET', params: { from, to, groupBy } })
+  }
+
+  async getGrowthTopHosts(period = 'weekly', limit = 20): Promise<any> {
+    return this.request({ url: '/admin/growth/hosts', method: 'GET', params: { period, limit } })
+  }
+
+  async getAdminRiskSummary(): Promise<any> {
+    return this.request({ url: '/admin/risk/summary', method: 'GET' })
+  }
+
+  // ============ RISK ============
+  async getRiskEvents(params?: Record<string, any>): Promise<any> {
+    return this.request({ url: '/admin/risk/events', method: 'GET', params })
+  }
+
+  async getFlaggedUsers(params?: Record<string, any>): Promise<any> {
+    return this.request({ url: '/admin/risk/users', method: 'GET', params })
+  }
+
+  async flagUser(id: string): Promise<any> {
+    return this.request({ url: `/admin/risk/users/${id}/flag`, method: 'POST', data: {} })
+  }
+
+  async clearUser(id: string): Promise<any> {
+    return this.request({ url: `/admin/risk/users/${id}/clear`, method: 'POST', data: {} })
+  }
+
+  async getRiskRules(): Promise<any> {
+    return this.request({ url: '/admin/risk/rules', method: 'GET' })
+  }
+
+  async createRiskRule(data: Record<string, any>): Promise<any> {
+    return this.request({ url: '/admin/risk/rules', method: 'POST', data })
+  }
+
+  async updateRiskRule(id: string, data: Record<string, any>): Promise<any> {
+    return this.request({ url: `/admin/risk/rules/${id}`, method: 'PATCH', data })
+  }
+
+  async toggleRiskRule(id: string): Promise<any> {
+    return this.request({ url: `/admin/risk/rules/${id}/toggle`, method: 'PATCH', data: {} })
+  }
+
+  // ============ MISSIONS ============
+  async adminGetMissions(params?: Record<string, any>): Promise<any> {
+    return this.request({ url: '/admin/missions', method: 'GET', params })
+  }
+
+  async adminCreateMission(data: Record<string, any>): Promise<any> {
+    return this.request({ url: '/admin/missions', method: 'POST', data })
+  }
+
+  async adminUpdateMission(id: string, data: Record<string, any>): Promise<any> {
+    return this.request({ url: `/admin/missions/${id}`, method: 'PATCH', data })
+  }
+
+  async adminToggleMission(id: string): Promise<any> {
+    return this.request({ url: `/admin/missions/${id}/toggle`, method: 'PATCH', data: {} })
+  }
+
+  // ============ VERIFICATION ============
+  async adminGetVerificationRequests(): Promise<any> {
+    return this.request({ url: '/admin/verification/requests', method: 'GET' })
+  }
+
+  async adminVerifyUser(id: string, badgeType: string): Promise<any> {
+    return this.request({ url: `/admin/users/${id}/verify`, method: 'POST', data: { badgeType } })
+  }
+
+  async adminUnverifyUser(id: string, badgeType: string): Promise<any> {
+    return this.request({ url: `/admin/users/${id}/unverify`, method: 'POST', data: { badgeType } })
+  }
+
+  async adminVerifyAgency(id: string): Promise<any> {
+    return this.request({ url: `/admin/agencies/${id}/verify`, method: 'POST', data: {} })
+  }
+
+  async getVerificationBadges(): Promise<any> {
+    return this.request({ url: '/verification/badges', method: 'GET' })
+  }
+
+  // ============ HOST RANKINGS ============
+  async getHostRanking(period = 'weekly', limit = 50): Promise<any> {
+    return this.request({ url: '/host/ranking', method: 'GET', params: { period, limit } })
+  }
+
+  // ============ PAYOUTS ============
+  async adminGetPayouts(params?: Record<string, any>): Promise<any> {
+    return this.request({ url: '/admin/agency/payouts', method: 'GET', params })
+  }
+
+  async adminApprovePayout(id: string): Promise<any> {
+    return this.request({ url: `/admin/agency/payouts/${id}/approve`, method: 'POST', data: {} })
+  }
+
+  async adminRejectPayout(id: string, reason?: string): Promise<any> {
+    return this.request({ url: `/admin/agency/payouts/${id}/reject`, method: 'POST', data: { reason } })
+  }
 }
 
 export const api = new ApiClient()

@@ -181,6 +181,42 @@ const navItems: NavItem[] = [
     requiredRole: 'admin',
   },
   {
+    label: "O'sish Paneli",
+    href: '/growth',
+    icon: ChartBarIcon,
+    requiredRole: 'admin',
+  },
+  {
+    label: 'Risk Boshqarish',
+    href: '/risk',
+    icon: ShieldExclamationIcon,
+    requiredRole: 'admin',
+  },
+  {
+    label: 'Vazifalar',
+    href: '/missions',
+    icon: StarIcon,
+    requiredRole: 'admin',
+  },
+  {
+    label: 'Tasdiqlash',
+    href: '/verification',
+    icon: IdentificationIcon,
+    requiredRole: 'admin',
+  },
+  {
+    label: 'Host Reytingi',
+    href: '/hosts',
+    icon: TrophyIcon,
+    requiredRole: 'admin',
+  },
+  {
+    label: "Host To'lovlari",
+    href: '/payouts',
+    icon: CurrencyDollarIcon,
+    requiredRole: 'super_admin',
+  },
+  {
     label: 'Settings',
     href: '/settings',
     icon: Cog6ToothIcon,

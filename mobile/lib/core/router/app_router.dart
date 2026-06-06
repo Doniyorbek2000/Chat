@@ -43,6 +43,12 @@ import '../../features/nameplate/presentation/screens/nameplate_screen.dart';
 import '../../features/referral/presentation/screens/referral_screen.dart';
 import '../../features/home/presentation/screens/search_screen.dart';
 import '../../features/home/presentation/screens/create_post_screen.dart';
+import '../../features/missions/presentation/screens/mission_center_screen.dart';
+import '../../features/host_level/presentation/screens/host_level_screen.dart';
+import '../../features/host_level/presentation/screens/host_ranking_screen.dart';
+import '../../features/pk_season/presentation/screens/pk_season_screen.dart';
+import '../../features/creator_analytics/presentation/screens/creator_analytics_screen.dart';
+import '../../features/agency_salary/presentation/screens/agency_host_dashboard_screen.dart';
 import '../providers/auth_provider.dart';
 
 class AppRoutes {
@@ -84,6 +90,12 @@ class AppRoutes {
   static const String referral = '/referral';
   static const String search = '/search';
   static const String createPost = '/create-post';
+  static const String missions = '/missions';
+  static const String hostLevel = '/host-level';
+  static const String hostRanking = '/host-ranking';
+  static const String pkSeason = '/pk-season';
+  static const String creatorAnalytics = '/creator-analytics';
+  static const String agencyHostDashboard = '/agency-host-dashboard';
 
   // Settings sub-routes
   static const String settingsLanguage = '/settings/language';
@@ -377,6 +389,30 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.referral,
         pageBuilder: (context, state) => _buildPage(state, const ReferralScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.missions,
+        pageBuilder: (context, state) => _buildPage(state, const MissionCenterScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.hostLevel,
+        pageBuilder: (context, state) => _buildPage(state, const HostLevelScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.hostRanking,
+        pageBuilder: (context, state) => _buildPage(state, const HostRankingScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.pkSeason,
+        pageBuilder: (context, state) => _buildPage(state, const PkSeasonScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.creatorAnalytics,
+        pageBuilder: (context, state) => _buildPage(state, const CreatorAnalyticsScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.agencyHostDashboard,
+        pageBuilder: (context, state) => _buildPage(state, const AgencyHostDashboardScreen()),
       ),
       GoRoute(
         path: AppRoutes.search,
