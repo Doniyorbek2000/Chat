@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole, GiftCategory, GiftType, VehicleLevel, RoomType, EventType, LinkType, Currency, RechargeProductType, NobleTier, AssetGrade, MedalCategory, ShopCategory } from '@prisma/client';
+import { PrismaClient, UserRole, GiftCategory, GiftType, VehicleLevel, RoomType, EventType, LinkType, Currency, RechargeProductType, NobleTier, AssetGrade, MedalCategory, ShopCategory, MissionPeriod, MissionActionType, MissionRewardType, PkSeasonStatus, RiskEventType, RiskActionType, BadgeType, HostLevelTier } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -1180,6 +1180,151 @@ async function seedPolicyPages() {
   console.log(`  Seeded ${policySlugTitles.length} policy pages.`);
 }
 
+// ---------------------------------------------------------------------------
+// Stage 9 seed functions
+// ---------------------------------------------------------------------------
+
+async function seedHostLevelRules() {
+  console.log('Seeding host level rules...');
+
+  const rules = [
+    { level: 1, tier: HostLevelTier.ROOKIE,   minXp: 0,      maxXp: 499,    title: 'Yangi Boshlovchi', rewardCoins: BigInt(0) },
+    { level: 2, tier: HostLevelTier.ROOKIE,   minXp: 500,    maxXp: 1499,   title: 'Boshlovchi',       rewardCoins: BigInt(500) },
+    { level: 3, tier: HostLevelTier.BRONZE,   minXp: 1500,   maxXp: 3499,   title: 'Bronza Host',      rewardCoins: BigInt(1000) },
+    { level: 4, tier: HostLevelTier.BRONZE,   minXp: 3500,   maxXp: 7499,   title: 'Bronza Pro',       rewardCoins: BigInt(2000) },
+    { level: 5, tier: HostLevelTier.SILVER,   minXp: 7500,   maxXp: 14999,  title: 'Kumush Host',      rewardCoins: BigInt(5000) },
+    { level: 6, tier: HostLevelTier.SILVER,   minXp: 15000,  maxXp: 29999,  title: 'Kumush Pro',       rewardCoins: BigInt(8000) },
+    { level: 7, tier: HostLevelTier.GOLD,     minXp: 30000,  maxXp: 59999,  title: 'Oltin Host',       rewardCoins: BigInt(15000) },
+    { level: 8, tier: HostLevelTier.GOLD,     minXp: 60000,  maxXp: 119999, title: 'Oltin Pro',        rewardCoins: BigInt(25000) },
+    { level: 9, tier: HostLevelTier.PLATINUM, minXp: 120000, maxXp: 249999, title: 'Platina Host',     rewardCoins: BigInt(50000) },
+    { level: 10, tier: HostLevelTier.DIAMOND, minXp: 250000, maxXp: 999999, title: 'Olmos Legend',     rewardCoins: BigInt(100000) },
+  ];
+
+  let created = 0;
+  for (const rule of rules) {
+    await prisma.hostLevelRule.upsert({
+      where: { level: rule.level },
+      update: { ...rule },
+      create: { ...rule },
+    });
+    created++;
+  }
+
+  console.log(`  Seeded ${created} host level rules.`);
+}
+
+async function seedMissions() {
+  console.log('Seeding missions...');
+
+  const missions = [
+    // Daily
+    { title: 'Kunlik Kirish', description: 'Bugun ilovaga kiring', period: MissionPeriod.DAILY, actionType: MissionActionType.LOGIN, targetCount: 1, rewardType: MissionRewardType.COINS, rewardAmount: BigInt(100), sortOrder: 1 },
+    { title: 'Sovg\'a Yuboring', description: '3 ta sovg\'a yuboring', period: MissionPeriod.DAILY, actionType: MissionActionType.SEND_GIFT, targetCount: 3, rewardType: MissionRewardType.COINS, rewardAmount: BigInt(200), sortOrder: 2 },
+    { title: 'Xonaga Kiring', description: '2 ta xonaga tashrif buyuring', period: MissionPeriod.DAILY, actionType: MissionActionType.JOIN_ROOM, targetCount: 2, rewardType: MissionRewardType.COINS, rewardAmount: BigInt(150), sortOrder: 3 },
+    { title: 'Xabar Yuboring', description: '10 ta xabar yuboring', period: MissionPeriod.DAILY, actionType: MissionActionType.SEND_MESSAGE, targetCount: 10, rewardType: MissionRewardType.COINS, rewardAmount: BigInt(100), sortOrder: 4 },
+    { title: 'Postga Like', description: '5 ta postga like basing', period: MissionPeriod.DAILY, actionType: MissionActionType.LIKE_POST, targetCount: 5, rewardType: MissionRewardType.COINS, rewardAmount: BigInt(80), sortOrder: 5 },
+    // Weekly
+    { title: 'Xona Ochish', description: 'Hafta davomida 3 ta xona oching', period: MissionPeriod.WEEKLY, actionType: MissionActionType.HOST_ROOM, targetCount: 3, rewardType: MissionRewardType.DIAMONDS, rewardAmount: BigInt(50), sortOrder: 1 },
+    { title: 'Do\'st Qo\'shing', description: 'Hafta davomida 5 ta do\'st qo\'shing', period: MissionPeriod.WEEKLY, actionType: MissionActionType.ADD_FRIEND, targetCount: 5, rewardType: MissionRewardType.COINS, rewardAmount: BigInt(500), sortOrder: 2 },
+    { title: '3 Kunlik Streak', description: '3 kun ketma-ket kiring', period: MissionPeriod.WEEKLY, actionType: MissionActionType.STREAK_3, targetCount: 1, rewardType: MissionRewardType.DIAMONDS, rewardAmount: BigInt(100), sortOrder: 3 },
+  ];
+
+  let created = 0;
+  for (const mission of missions) {
+    const existing = await prisma.mission.findFirst({ where: { title: mission.title, period: mission.period } });
+    if (!existing) {
+      await prisma.mission.create({ data: { ...mission, isActive: true } });
+      created++;
+    }
+  }
+
+  console.log(`  Seeded ${created} missions.`);
+}
+
+async function seedPkSeason() {
+  console.log('Seeding PK season...');
+
+  const now = new Date();
+  const existing = await prisma.pkSeason.findFirst({ where: { status: PkSeasonStatus.ACTIVE } });
+  if (!existing) {
+    const season = await prisma.pkSeason.create({
+      data: {
+        name: 'PK Season 1',
+        status: PkSeasonStatus.ACTIVE,
+        startAt: now,
+        endAt: new Date(now.getTime() + 30 * 86400000),
+        description: 'Birinchi PK mavsumi - eng yaxshi host bo\'ling!',
+      },
+    });
+
+    // Season rewards
+    await prisma.pkSeasonReward.createMany({
+      data: [
+        { seasonId: season.id, rankFrom: 1, rankTo: 1, rewardType: 'DIAMONDS', rewardAmount: BigInt(5000), description: '1-o\'rin: 5000 olmos' },
+        { seasonId: season.id, rankFrom: 2, rankTo: 3, rewardType: 'DIAMONDS', rewardAmount: BigInt(2000), description: '2-3-o\'rin: 2000 olmos' },
+        { seasonId: season.id, rankFrom: 4, rankTo: 10, rewardType: 'COINS', rewardAmount: BigInt(10000), description: '4-10-o\'rin: 10000 tanga' },
+        { seasonId: season.id, rankFrom: 11, rankTo: 50, rewardType: 'COINS', rewardAmount: BigInt(2000), description: '11-50-o\'rin: 2000 tanga' },
+      ],
+    });
+
+    console.log(`  Seeded PK Season 1 with rewards.`);
+  } else {
+    console.log('  Active PK season already exists, skipping.');
+  }
+}
+
+async function seedRiskRules() {
+  console.log('Seeding risk rules...');
+
+  const rules = [
+    { name: 'Ko\'p Akkaunt', eventType: RiskEventType.MULTI_ACCOUNT, scoreDelta: 40, action: RiskActionType.FLAG, threshold: 40, description: 'Bir xil qurilmadan bir nechta akkaunt' },
+    { name: 'O\'z-o\'ziga Referal', eventType: RiskEventType.SELF_REFERRAL, scoreDelta: 30, action: RiskActionType.FLAG, threshold: 30, description: 'O\'z referal kodidan foydalanish' },
+    { name: 'Aylana Sovg\'a', eventType: RiskEventType.CIRCULAR_GIFT, scoreDelta: 35, action: RiskActionType.RESTRICT_WITHDRAWAL, threshold: 70, description: 'Foydalanuvchilar o\'rtasida aylana sovg\'a' },
+    { name: 'Sovg\'a Spami', eventType: RiskEventType.GIFT_SPAM, scoreDelta: 20, action: RiskActionType.WARN, threshold: 60, description: '60 soniyada 20+ sovg\'a yuborish' },
+    { name: 'Shubhali Yechim', eventType: RiskEventType.SUSPICIOUS_WITHDRAWAL, scoreDelta: 25, action: RiskActionType.RESTRICT_WITHDRAWAL, threshold: 50, description: 'Katta miqdordagi shubhali yechim' },
+    { name: 'Qurilma Firibgarligi', eventType: RiskEventType.DEVICE_FRAUD, scoreDelta: 45, action: RiskActionType.SUSPEND, threshold: 45, description: 'Qurilma identifikatorini soxtalashtirish' },
+    { name: 'IP Firibgarligi', eventType: RiskEventType.IP_FRAUD, scoreDelta: 30, action: RiskActionType.FLAG, threshold: 60, description: 'Shubhali IP manzilidan kirish' },
+    { name: 'Webhook Takrorlanishi', eventType: RiskEventType.WEBHOOK_REPLAY, scoreDelta: 50, action: RiskActionType.BAN, threshold: 50, description: 'To\'lov webhook takroriy yuborilishi' },
+  ];
+
+  let created = 0;
+  for (const rule of rules) {
+    const existing = await prisma.riskRule.findFirst({ where: { eventType: rule.eventType } });
+    if (!existing) {
+      await prisma.riskRule.create({ data: { ...rule, isActive: true } });
+      created++;
+    }
+  }
+
+  console.log(`  Seeded ${created} risk rules.`);
+}
+
+async function seedVerificationBadges() {
+  console.log('Seeding verification badges...');
+
+  const badges = [
+    { type: BadgeType.PHONE_VERIFIED, name: 'Telefon Tasdiqlangan', icon: '📱', description: 'Telefon raqami tasdiqlangan' },
+    { type: BadgeType.EMAIL_VERIFIED, name: 'Email Tasdiqlangan', icon: '✉️', description: 'Email manzili tasdiqlangan' },
+    { type: BadgeType.VERIFIED_HOST, name: 'Tasdiqlangan Host', icon: '🎙️', description: 'Rasmiy tasdiqlangan host' },
+    { type: BadgeType.VERIFIED_AGENCY, name: 'Tasdiqlangan Agentlik', icon: '🏢', description: 'Rasmiy tasdiqlangan agentlik' },
+    { type: BadgeType.OFFICIAL, name: 'Rasmiy Akkaunt', icon: '✅', description: 'VOXO rasmiy akkaunt' },
+    { type: BadgeType.SAFE_ROOM, name: 'Xavfsiz Xona', icon: '🛡️', description: 'Xavfsiz xona sertifikati' },
+    { type: BadgeType.TOP_CREATOR, name: 'Top Yaratuvchi', icon: '⭐', description: 'Eng yaxshi kontent yaratuvchi' },
+  ];
+
+  let created = 0;
+  for (const badge of badges) {
+    await prisma.verificationBadge.upsert({
+      where: { type: badge.type },
+      update: { name: badge.name, icon: badge.icon, description: badge.description },
+      create: { ...badge },
+    });
+    created++;
+  }
+
+  console.log(`  Seeded ${created} verification badges.`);
+}
+
 async function main() {
   console.log('Starting VOXO database seed...\n');
 
@@ -1231,6 +1376,13 @@ async function main() {
 
   // Stage 6 seeds
   await seedPolicyPages();
+
+  // Stage 9 seeds
+  await seedHostLevelRules();
+  await seedMissions();
+  await seedPkSeason();
+  await seedRiskRules();
+  await seedVerificationBadges();
 
   console.log('\nVOXO seed completed successfully!');
   console.log('-----------------------------------');

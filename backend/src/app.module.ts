@@ -39,6 +39,16 @@ import { HomeModule } from './modules/home/home.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { SupportModule } from './modules/support/support.module';
 import { HealthModule } from './health/health.module';
+import { SupportersModule } from './modules/supporters/supporters.module';
+import { HostLevelModule } from './modules/host-level/host-level.module';
+import { MissionsModule } from './modules/missions/missions.module';
+import { PkSeasonModule } from './modules/pk-season/pk-season.module';
+import { AgencySalaryModule } from './modules/agency-salary/agency-salary.module';
+import { CreatorAnalyticsModule } from './modules/creator-analytics/creator-analytics.module';
+import { RiskModule } from './modules/risk/risk.module';
+import { RoomModerationModule } from './modules/room-moderation/room-moderation.module';
+import { VerificationModule } from './modules/verification/verification.module';
+import { GrowthDashboardModule } from './modules/growth-dashboard/growth-dashboard.module';
 
 @Module({
   imports: [
@@ -107,6 +117,16 @@ import { HealthModule } from './health/health.module';
     SettingsModule,
     SupportModule,
     HealthModule,
+    SupportersModule,
+    HostLevelModule,
+    MissionsModule,
+    PkSeasonModule,
+    AgencySalaryModule,
+    CreatorAnalyticsModule,
+    RiskModule,
+    RoomModerationModule,
+    VerificationModule,
+    GrowthDashboardModule,
   ],
 })
 export class AppModule {}
