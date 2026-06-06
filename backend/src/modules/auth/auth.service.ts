@@ -77,7 +77,9 @@ export class AuthService {
     await this.redis.incr(`otp_attempts:${phone}`);
     await this.redis.expire(`otp_attempts:${phone}`, 3600);
 
-    this.logger.log(`OTP for ${phone}: ${otp}`);
+    // PII-safe log: mask phone and never log OTP in production
+    const maskedPhone = phone.replace(/(\+\d{3})\d+(\d{2})$/, '$1****$2');
+    this.logger.log(`OTP sent to ${maskedPhone}`);
 
     // In production, integrate with SMS provider (Eskiz.uz, Play Mobile, etc.)
     // await this.smsService.send(phone, `Your VOXO verification code: ${otp}`);
