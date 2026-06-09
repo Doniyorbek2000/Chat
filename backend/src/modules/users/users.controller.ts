@@ -24,6 +24,7 @@ import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -67,6 +68,15 @@ export class UsersController {
   ) {
     const url = await this.usersService.uploadCover(userId, file);
     return { url };
+  }
+
+  @Public()
+  @Get('check-username')
+  @ApiOperation({ summary: 'Check username availability' })
+  @ApiQuery({ name: 'username', required: true })
+  async checkUsername(@Query('username') username: string) {
+    const taken = await this.usersService.isUsernameTaken(username);
+    return { available: !taken };
   }
 
   @Get('search')

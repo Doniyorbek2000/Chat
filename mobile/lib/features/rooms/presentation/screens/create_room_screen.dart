@@ -1,11 +1,13 @@
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/voxo_button.dart';
 
@@ -67,12 +69,47 @@ class _CreateRoomScreenState extends ConsumerState<CreateRoomScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     ref.read(_createRoomLoadingProvider.notifier).state = true;
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      final api = ref.read(apiClientProvider);
 
-    if (mounted) {
-      ref.read(_createRoomLoadingProvider.notifier).state = false;
-      // Navigate to room (would get room ID from API)
-      context.go('/rooms/new_room_id');
+      final body = <String, dynamic>{
+        'title': _titleCtrl.text.trim(),
+        'description': _descCtrl.text.trim(),
+        'roomType': _roomType.name.toUpperCase(),
+        'maxSeats': _seatCount,
+        'language': _language,
+        if (_tags.isNotEmpty) 'tags': _tags,
+        if (_roomType == _RoomTypeOption.password && _passwordCtrl.text.isNotEmpty)
+          'password': _passwordCtrl.text,
+      };
+
+      // Upload cover if selected
+      if (_coverPath != null) {
+        final formData = FormData.fromMap({
+          'file': await MultipartFile.fromFile(_coverPath!, filename: 'cover.jpg'),
+        });
+        final uploadRes = await api.uploadFile('/storage/upload', formData);
+        final url = (uploadRes.data is Map ? uploadRes.data['url'] : null) as String?;
+        if (url != null) body['coverImage'] = url;
+      }
+
+      final res = await api.post('/rooms', data: body);
+      final roomId = (res.data is Map ? res.data['id'] ?? res.data['data']?['id'] : null) as String?;
+
+      if (mounted) {
+        context.go('/rooms/${roomId ?? 'new'}');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString(), style: const TextStyle(fontFamily: 'Poppins')),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) ref.read(_createRoomLoadingProvider.notifier).state = false;
     }
   }
 

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../../core/network/api_client.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -54,18 +55,30 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   }
 
   Future<void> _checkUsernameAvailability(String username) async {
+    if (username.length < 3) return;
     setState(() {
       _isCheckingUsername = true;
       _isUsernameChecked = false;
     });
-    // Simulate API check
-    await Future.delayed(const Duration(milliseconds: 400));
-    if (mounted) {
-      setState(() {
-        _isCheckingUsername = false;
-        _isUsernameChecked = true;
-        _isUsernameAvailable = username.length >= 3 && !username.contains(' ');
-      });
+    try {
+      final api = ref.read(apiClientProvider);
+      final res = await api.get('/users/check-username?username=${Uri.encodeComponent(username)}');
+      final available = res.data is Map ? (res.data['available'] as bool? ?? false) : false;
+      if (mounted) {
+        setState(() {
+          _isCheckingUsername = false;
+          _isUsernameChecked = true;
+          _isUsernameAvailable = available;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isCheckingUsername = false;
+          _isUsernameChecked = true;
+          _isUsernameAvailable = username.length >= 3 && !username.contains(' ');
+        });
+      }
     }
   }
 

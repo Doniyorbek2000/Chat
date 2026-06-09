@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
 
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_colors.dart';
 
 // ---------------------------------------------------------------------------
@@ -20,56 +21,49 @@ final _roomListCategoryProvider = StateProvider<String>((ref) => 'All');
 
 final _roomListProvider =
     StateNotifierProvider<_RoomListNotifier, AsyncValue<List<Map<String, dynamic>>>>(
-        (ref) => _RoomListNotifier());
+        (ref) => _RoomListNotifier(ref));
 
 class _RoomListNotifier
     extends StateNotifier<AsyncValue<List<Map<String, dynamic>>>> {
-  _RoomListNotifier() : super(const AsyncValue.loading()) {
+  final Ref _ref;
+  int _page = 1;
+  bool _hasMore = true;
+
+  _RoomListNotifier(this._ref) : super(const AsyncValue.loading()) {
     load();
   }
 
-  Future<void> load({int page = 1}) async {
-    if (page == 1) state = const AsyncValue.loading();
-    await Future.delayed(const Duration(milliseconds: 700));
-    state = AsyncValue.data(_generateRooms(page));
+  Future<void> load({int page = 1, String category = 'All', String sort = 'hot'}) async {
+    if (page == 1) {
+      _page = 1;
+      _hasMore = true;
+      state = const AsyncValue.loading();
+    }
+    try {
+      final api = _ref.read(apiClientProvider);
+      final catParam = category != 'All' ? '&category=${category.toLowerCase()}' : '';
+      final sortParam = sort == 'hot' ? '' : '&sort=$sort';
+      final res = await api.get('/rooms/feed?page=$page&limit=20$catParam$sortParam');
+      final data = res.data;
+      final List<dynamic> raw = (data is Map ? data['data'] ?? data['rooms'] ?? [] : data) as List;
+      final rooms = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      _hasMore = rooms.length >= 20;
+      if (page == 1) {
+        state = AsyncValue.data(rooms);
+      } else {
+        final prev = state.value ?? [];
+        state = AsyncValue.data([...prev, ...rooms]);
+      }
+      _page = page;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
   }
 
-  List<Map<String, dynamic>> _generateRooms(int page) {
-    return List.generate(15, (i) {
-      final idx = (page - 1) * 15 + i;
-      return {
-        'id': 'room_list_$idx',
-        'title': _titles[idx % _titles.length],
-        'cover':
-            'https://picsum.photos/seed/list$idx/120/120',
-        'hostName': 'Host ${idx + 1}',
-        'hostAvatar':
-            'https://api.dicebear.com/7.x/avataaars/png?seed=h$idx',
-        'viewerCount': (idx + 1) * 38,
-        'isVip': idx % 4 == 0,
-        'isLive': true,
-        'type': ['Public', 'VIP', 'Private'][idx % 3],
-      };
-    });
+  Future<void> loadMore(String category, String sort) async {
+    if (!_hasMore || state is AsyncLoading) return;
+    await load(page: _page + 1, category: category, sort: sort);
   }
-
-  static const _titles = [
-    'Night Chill Zone',
-    'Music Lovers',
-    'Comedy Club',
-    'Debate Arena',
-    'Study Together',
-    'Gaming Lounge',
-    'Travel Talks',
-    'Fitness Hub',
-    'Poetry Night',
-    'Business Minds',
-    'Language Exchange',
-    'Movie Discussion',
-    'Tech Talk',
-    'Art Corner',
-    'Cooking Corner',
-  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -93,9 +87,10 @@ class _RoomListScreenState extends ConsumerState<RoomListScreen> {
   }
 
   void _onScroll() {
-    if (_scrollCtrl.position.pixels >=
-        _scrollCtrl.position.maxScrollExtent - 200) {
-      // Load more - simplified
+    if (_scrollCtrl.position.pixels >= _scrollCtrl.position.maxScrollExtent - 200) {
+      final category = ref.read(_roomListCategoryProvider);
+      final sort = ref.read(_roomListSortProvider).name;
+      ref.read(_roomListProvider.notifier).loadMore(category, sort);
     }
   }
 
@@ -128,8 +123,11 @@ class _RoomListScreenState extends ConsumerState<RoomListScreen> {
             color: AppColors.cardDark,
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12)),
-            onSelected: (option) =>
-                ref.read(_roomListSortProvider.notifier).state = option,
+            onSelected: (option) {
+              ref.read(_roomListSortProvider.notifier).state = option;
+              final cat = ref.read(_roomListCategoryProvider);
+              ref.read(_roomListProvider.notifier).load(category: cat, sort: option.name);
+            },
             itemBuilder: (_) => [
               _buildPopupItem(RoomSortOption.hot, 'Hot', Icons.local_fire_department),
               _buildPopupItem(RoomSortOption.newest, 'New', Icons.fiber_new),
@@ -148,8 +146,11 @@ class _RoomListScreenState extends ConsumerState<RoomListScreen> {
       body: RefreshIndicator(
         color: AppColors.primary,
         backgroundColor: AppColors.cardDark,
-        onRefresh: () =>
-            ref.read(_roomListProvider.notifier).load(),
+        onRefresh: () {
+          final category = ref.read(_roomListCategoryProvider);
+          final sort = ref.read(_roomListSortProvider).name;
+          return ref.read(_roomListProvider.notifier).load(category: category, sort: sort);
+        },
         child: rooms.when(
           loading: () => _buildShimmer(),
           error: (_, __) => _buildErrorState(),
@@ -199,7 +200,11 @@ class _RoomListScreenState extends ConsumerState<RoomListScreen> {
           final cat = categories[i];
           final isSelected = selected == cat;
           return GestureDetector(
-            onTap: () => ref.read(_roomListCategoryProvider.notifier).state = cat,
+            onTap: () {
+              ref.read(_roomListCategoryProvider.notifier).state = cat;
+              final sort = ref.read(_roomListSortProvider).name;
+              ref.read(_roomListProvider.notifier).load(category: cat, sort: sort);
+            },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
@@ -255,8 +260,11 @@ class _RoomListScreenState extends ConsumerState<RoomListScreen> {
                   color: AppColors.textSecondary, fontFamily: 'Poppins')),
           const SizedBox(height: 16),
           ElevatedButton(
-            onPressed: () =>
-                ref.read(_roomListProvider.notifier).load(),
+            onPressed: () {
+              final cat = ref.read(_roomListCategoryProvider);
+              final sort = ref.read(_roomListSortProvider).name;
+              ref.read(_roomListProvider.notifier).load(category: cat, sort: sort);
+            },
             style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary),
             child: const Text('Retry'),

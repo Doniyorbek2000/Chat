@@ -342,4 +342,13 @@ export class UsersService {
       data: { fcmToken },
     });
   }
+
+  async isUsernameTaken(username: string): Promise<boolean> {
+    if (!username || username.length < 3) return true;
+    const user = await this.prisma.user.findFirst({
+      where: { username: { equals: username, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    return !!user;
+  }
 }
