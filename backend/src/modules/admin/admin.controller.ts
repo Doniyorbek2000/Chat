@@ -201,6 +201,32 @@ export class AdminController {
     return this.adminService.unbanFamily(adminId, familyId);
   }
 
+  // ==================== COUPLES (ADMIN) ====================
+
+  @Get('couples')
+  getCouples(
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page = 1,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit = 20,
+  ) {
+    return this.adminService.getCouples({ search, status, page, limit });
+  }
+
+  @Get('couples/:id')
+  getCoupleById(@Param('id') id: string) {
+    return this.adminService.getCoupleById(id);
+  }
+
+  @Post('couples/:id/end')
+  endCoupleByAdmin(
+    @CurrentUser('id') adminId: string,
+    @Param('id') coupleId: string,
+    @Body('reason') reason: string,
+  ) {
+    return this.adminService.endCoupleByAdmin(adminId, coupleId, reason);
+  }
+
   // ==================== AGENCIES (ADMIN) ====================
 
   @Get('agencies')

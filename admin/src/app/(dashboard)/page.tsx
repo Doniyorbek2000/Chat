@@ -317,12 +317,13 @@ export default function DashboardPage() {
                 <div key={h} className="flex-1 text-center text-xs text-dark-500">{h}</div>
               ))}
             </div>
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, di) => (
               <div key={day} className="flex items-center gap-2 mb-1.5">
                 <span className="text-xs text-dark-500 w-8 shrink-0">{day}</span>
                 <div className="flex gap-1 flex-1">
                   {Array.from({ length: 24 }, (_, h) => {
-                    const intensity = Math.random()
+                    const seed = (di * 24 + h) * 2654435761
+                    const intensity = ((seed >>> 0) % 1000) / 1000
                     const opacity = intensity > 0.7 ? 'opacity-100' : intensity > 0.4 ? 'opacity-60' : intensity > 0.2 ? 'opacity-30' : 'opacity-10'
                     return (
                       <div

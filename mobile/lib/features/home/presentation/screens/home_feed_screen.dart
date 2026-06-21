@@ -246,7 +246,10 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> {
         itemBuilder: (ctx, i) {
           final cat = _categories[i];
           return GestureDetector(
-            onTap: () {},
+            onTap: () {
+              final label = cat['label'] as String? ?? '';
+              context.push('/rooms?category=${Uri.encodeComponent(label)}');
+            },
             child: Container(
               width: 74,
               decoration: BoxDecoration(

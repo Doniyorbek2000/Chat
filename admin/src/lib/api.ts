@@ -277,6 +277,19 @@ class ApiClient {
     return this.request({ url: `/admin/families/${id}/unban`, method: 'POST' })
   }
 
+  // ============ COUPLES ============
+  async getCouples(params?: QueryParams): Promise<PaginatedResponse<any>> {
+    return this.request({ url: '/admin/couples', method: 'GET', params })
+  }
+
+  async getCouple(id: string): Promise<any> {
+    return this.request({ url: `/admin/couples/${id}`, method: 'GET' })
+  }
+
+  async endCouple(id: string, reason: string): Promise<void> {
+    return this.request({ url: `/admin/couples/${id}/end`, method: 'POST', data: { reason } })
+  }
+
   // ============ AGENCIES ============
   async getAgencies(params?: QueryParams): Promise<PaginatedResponse<Agency>> {
     return this.request({ url: '/admin/agencies', method: 'GET', params })

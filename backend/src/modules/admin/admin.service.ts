@@ -1091,6 +1091,68 @@ export class AdminService {
     return { success: true, message: 'Family unbanned successfully', familyId };
   }
 
+  // ==================== COUPLES ADMIN ====================
+
+  async getCouples(filters: { search?: string; status?: string; page?: number; limit?: number }) {
+    const { search, status, page = 1, limit = 20 } = filters;
+    const where: any = {};
+
+    if (status && status !== 'all') {
+      where.status = status.toUpperCase();
+    }
+
+    if (search) {
+      where.OR = [
+        { user1: { displayName: { contains: search, mode: 'insensitive' } } },
+        { user1: { username: { contains: search, mode: 'insensitive' } } },
+        { user2: { displayName: { contains: search, mode: 'insensitive' } } },
+        { user2: { username: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.couple.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user1: { select: { id: true, uid: true, displayName: true, avatar: true, level: true } },
+          user2: { select: { id: true, uid: true, displayName: true, avatar: true, level: true } },
+        },
+      }),
+      this.prisma.couple.count({ where }),
+    ]);
+
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async getCoupleById(coupleId: string) {
+    const couple = await this.prisma.couple.findUnique({
+      where: { id: coupleId },
+      include: {
+        user1: { select: { id: true, uid: true, displayName: true, avatar: true, level: true, isVip: true } },
+        user2: { select: { id: true, uid: true, displayName: true, avatar: true, level: true, isVip: true } },
+      },
+    });
+    if (!couple) throw new NotFoundException('Couple not found');
+    return couple;
+  }
+
+  async endCoupleByAdmin(adminId: string, coupleId: string, reason: string) {
+    const couple = await this.prisma.couple.findUnique({ where: { id: coupleId } });
+    if (!couple) throw new NotFoundException('Couple not found');
+    if (couple.status !== 'ACTIVE') throw new BadRequestException('Couple is not active');
+
+    const updated = await this.prisma.couple.update({
+      where: { id: coupleId },
+      data: { status: 'ENDED', endedAt: new Date(), endedBy: adminId, endReason: reason || 'Ended by admin' },
+    });
+
+    await this.createAuditLog(adminId, 'END_COUPLE', 'Couple', coupleId, { reason });
+    return updated;
+  }
+
   // ==================== AGENCIES ADMIN ====================
 
   async getAgencies(filters: { search?: string; page?: number; limit?: number }) {

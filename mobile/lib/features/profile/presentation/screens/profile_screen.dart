@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/models/user_model.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -20,6 +21,23 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  bool _followLoading = false;
+
+  Future<void> _toggleFollow(UserModel user) async {
+    if (_followLoading) return;
+    setState(() => _followLoading = true);
+    try {
+      final api = ref.read(apiClientProvider);
+      if (user.isFollowing) {
+        await api.delete('/users/${user.id}/follow');
+      } else {
+        await api.post('/users/${user.id}/follow');
+      }
+      ref.read(authProvider.notifier).refreshUserData();
+    } catch (_) {}
+    if (mounted) setState(() => _followLoading = false);
+  }
+
   bool get _isOwnProfile {
     final currentUser = ref.read(currentUserProvider);
     final uid = widget.uid;
@@ -400,7 +418,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ? VoxoButtonType.outline
                     : VoxoButtonType.primary,
                 size: VoxoButtonSize.medium,
-                onPressed: () {},
+                isLoading: _followLoading,
+                onPressed: () => _toggleFollow(user),
               ),
             ),
             const SizedBox(width: 12),

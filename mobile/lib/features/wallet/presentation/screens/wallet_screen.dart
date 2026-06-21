@@ -48,7 +48,8 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
         actions: [
           IconButton(
             icon: const Icon(Icons.history, color: Colors.white70),
-            onPressed: () {},
+            onPressed: () => ref.read(walletProvider.notifier).loadWallet(),
+            tooltip: 'Refresh',
           ),
         ],
       ),

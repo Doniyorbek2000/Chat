@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -94,6 +95,40 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
       setState(() => _isLoading = false);
       if (mounted) {
         AppUtils.showErrorSnackBar(context, 'Google sign in failed');
+      }
+    }
+  }
+
+  Future<void> _appleSignIn() async {
+    setState(() => _isLoading = true);
+    try {
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+
+      final identityToken = credential.identityToken;
+      if (identityToken == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      final success = await ref.read(authProvider.notifier).loginWithApple(
+            identityToken: identityToken,
+            firstName: credential.givenName,
+            lastName: credential.familyName,
+          );
+      setState(() => _isLoading = false);
+
+      if (success && mounted) {
+        context.go(AppRoutes.home);
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        AppUtils.showErrorSnackBar(context, 'Apple sign in failed');
       }
     }
   }
@@ -410,9 +445,7 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
             icon: Icons.apple,
             iconColor: Colors.black,
             backgroundColor: Colors.white,
-            onPressed: _isLoading ? null : () {
-              // TODO: Apple sign in implementation
-            },
+            onPressed: _isLoading ? null : _appleSignIn,
           ),
         ],
       ],

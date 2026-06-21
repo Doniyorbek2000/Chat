@@ -1,6 +1,9 @@
+import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/providers/auth_provider.dart';
@@ -17,6 +20,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _displayNameCtrl = TextEditingController();
   final _bioCtrl = TextEditingController();
   bool _saving = false;
+  String? _newAvatarPath;
 
   @override
   void initState() {
@@ -33,6 +37,22 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _displayNameCtrl.dispose();
     _bioCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickAvatar() async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80, maxWidth: 512, maxHeight: 512);
+    if (image != null) {
+      setState(() => _newAvatarPath = image.path);
+      try {
+        final api = ref.read(apiClientProvider);
+        final formData = FormData.fromMap({
+          'file': await MultipartFile.fromFile(image.path, filename: image.name),
+        });
+        await api.post('/users/me/avatar', data: formData);
+        ref.read(authProvider.notifier).refreshUserData();
+      } catch (_) {}
+    }
   }
 
   Future<void> _save() async {
@@ -96,15 +116,17 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 children: [
                   CircleAvatar(
                     radius: 52,
-                    backgroundImage: user?.avatar != null ? NetworkImage(user!.avatar!) : null,
+                    backgroundImage: _newAvatarPath != null
+                        ? FileImage(File(_newAvatarPath!))
+                        : (user?.avatar != null ? NetworkImage(user!.avatar!) : null) as ImageProvider?,
                     backgroundColor: AppColors.surface,
-                    child: user?.avatar == null ? Text(
+                    child: _newAvatarPath == null && user?.avatar == null ? Text(
                       (user?.displayName ?? 'U').isNotEmpty ? (user?.displayName ?? 'U')[0].toUpperCase() : 'U',
                       style: const TextStyle(fontSize: 36, color: Colors.white, fontWeight: FontWeight.bold),
                     ) : null,
                   ),
                   GestureDetector(
-                    onTap: () {},
+                    onTap: _pickAvatar,
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(

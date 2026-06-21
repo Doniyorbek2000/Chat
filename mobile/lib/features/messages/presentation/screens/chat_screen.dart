@@ -138,9 +138,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ),
         ),
         actions: [
-          IconButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.white70),
-            onPressed: () {},
+            color: AppColors.cardDark,
+            onSelected: (val) {
+              if (val == 'profile') {
+                context.push('/profile/${widget.userId}');
+              }
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'profile', child: Text('View Profile', style: TextStyle(color: Colors.white))),
+            ],
           ),
         ],
       ),

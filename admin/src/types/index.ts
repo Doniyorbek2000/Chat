@@ -406,6 +406,23 @@ export interface UserGrowthDataPoint {
   totalUsers: number
 }
 
+// ============ COUPLES ============
+export interface Couple {
+  id: string
+  user1Id: string
+  user2Id: string
+  user1: { id: string; uid: string; displayName: string; avatar?: string; level: number; isVip?: boolean }
+  user2: { id: string; uid: string; displayName: string; avatar?: string; level: number; isVip?: boolean }
+  level: number
+  xp: number
+  anniversaryDate?: string
+  status: 'ACTIVE' | 'ENDED'
+  endedAt?: string
+  endedBy?: string
+  endReason?: string
+  createdAt: string
+}
+
 // ============ PAGINATION ============
 export interface PaginatedResponse<T> {
   data: T[]

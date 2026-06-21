@@ -468,7 +468,12 @@ class _RoomScreenState extends ConsumerState<RoomScreen>
       isMine: false,
       isSpeaking: seat?.speakingLevel != null &&
           seat!.speakingLevel > 20,
-      onTap: () {},
+      onTap: () {
+        final hostId = seat?.user?.id ?? user?.id;
+        if (hostId != null) {
+          context.push('/profile/$hostId');
+        }
+      },
     );
   }
 
