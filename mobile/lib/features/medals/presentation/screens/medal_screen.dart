@@ -219,7 +219,7 @@ class _MedalScreenState extends ConsumerState<MedalScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Xatolik: $e'), backgroundColor: Colors.red),
+              content: const Text('Amaliyot bajarilmadi'), backgroundColor: Colors.red),
         );
       }
     }
@@ -256,7 +256,7 @@ class _MedalScreenState extends ConsumerState<MedalScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Xatolik: $e'), backgroundColor: Colors.red),
+              content: const Text('Amaliyot bajarilmadi'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -283,7 +283,7 @@ class _MedalScreenState extends ConsumerState<MedalScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Xatolik: $e'), backgroundColor: Colors.red),
+              content: const Text('Amaliyot bajarilmadi'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -309,7 +309,7 @@ class _MedalScreenState extends ConsumerState<MedalScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Xatolik: $e'), backgroundColor: Colors.red),
+              content: const Text('Amaliyot bajarilmadi'), backgroundColor: Colors.red),
         );
       }
     } finally {

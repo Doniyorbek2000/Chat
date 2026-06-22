@@ -38,7 +38,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Xatolik: $e'), backgroundColor: Colors.red),
+          SnackBar(content: const Text('Amaliyot bajarilmadi'), backgroundColor: Colors.red),
         );
       }
     } finally {

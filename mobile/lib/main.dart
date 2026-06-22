@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'core/services/notification_service.dart';
 import 'core/storage/local_storage.dart';
 import 'app.dart';
 
@@ -30,9 +31,10 @@ Future<void> main() async {
   // Initialize Hive
   await LocalStorageService.init();
 
-  // Initialize Firebase
+  // Initialize Firebase & notifications
   try {
     await Firebase.initializeApp();
+    await NotificationService().initialize();
   } catch (e) {
     debugPrint('Firebase init error: $e');
   }

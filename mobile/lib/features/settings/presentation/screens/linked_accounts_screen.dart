@@ -109,7 +109,7 @@ class _LinkedAccountsScreenState extends ConsumerState<LinkedAccountsScreen> {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text("Xatolik: $e"),
+                      content: const Text('Amaliyot bajarilmadi'),
                       backgroundColor: AppColors.error,
                     ),
                   );

@@ -69,7 +69,7 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Xatolik: $e"),
+            content: const Text('Amaliyot bajarilmadi'),
             backgroundColor: AppColors.error,
           ),
         );
@@ -96,7 +96,7 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Xatolik: $e"),
+            content: const Text('Amaliyot bajarilmadi'),
             backgroundColor: AppColors.error,
           ),
         );

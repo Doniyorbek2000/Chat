@@ -51,10 +51,23 @@ class ApiClient {
     this.client.interceptors.response.use(
       (response) => response,
       (error) => {
-        if (error.response?.status === 401) {
+        const status = error.response?.status
+        if (status === 401) {
           if (typeof window !== 'undefined') {
             window.location.href = '/login'
           }
+        }
+        const serverMsg = error.response?.data?.message
+        if (serverMsg) {
+          error.message = Array.isArray(serverMsg) ? serverMsg.join(', ') : serverMsg
+        } else if (status === 403) {
+          error.message = 'You do not have permission to perform this action'
+        } else if (status === 404) {
+          error.message = 'The requested resource was not found'
+        } else if (status === 429) {
+          error.message = 'Too many requests. Please try again later'
+        } else if (status && status >= 500) {
+          error.message = 'Server error. Please try again later'
         }
         return Promise.reject(error)
       }

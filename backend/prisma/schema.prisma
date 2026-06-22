@@ -523,6 +523,7 @@ model Transaction {
   @@index([type])
   @@index([createdAt])
   @@index([referenceId])
+  @@index([userId, createdAt])
   @@map("transactions")
 }
 
@@ -648,6 +649,7 @@ model RoomMember {
   @@index([roomId])
   @@index([userId])
   @@index([joinedAt])
+  @@index([roomId, joinedAt])
   @@map("room_members")
 }
 
@@ -698,6 +700,8 @@ model GiftTransaction {
   @@index([receiverId])
   @@index([roomId])
   @@index([createdAt])
+  @@index([senderId, createdAt])
+  @@index([receiverId, createdAt])
   @@map("gift_transactions")
 }
 
@@ -871,6 +875,8 @@ model Chat {
   @@index([senderId, receiverId])
   @@index([receiverId, senderId])
   @@index([createdAt])
+  @@index([senderId, createdAt])
+  @@index([receiverId, createdAt])
   @@map("chats")
 }
 

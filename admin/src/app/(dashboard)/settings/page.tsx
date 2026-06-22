@@ -11,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline'
 import Toggle from '@/components/ui/Toggle'
 import FormField from '@/components/ui/FormField'
+import { ConfirmModal } from '@/components/ui/Modal'
 import { api } from '@/lib/api'
 import { formatNumber } from '@/lib/utils'
 import type { CoinPackage } from '@/types'
@@ -102,13 +103,18 @@ export default function SettingsPage() {
     }
   }
 
-  const handleDeletePkg = async (id: string) => {
+  const [deletePkgTarget, setDeletePkgTarget] = useState<string | null>(null)
+
+  const handleDeletePkg = async () => {
+    if (!deletePkgTarget) return
     try {
-      await api.deleteCoinPackage(id)
-      setPackages(prev => prev.filter(p => p.id !== id))
+      await api.deleteCoinPackage(deletePkgTarget)
+      setPackages(prev => prev.filter(p => p.id !== deletePkgTarget))
       toast.success('Package deleted')
     } catch {
       toast.error('Failed to delete')
+    } finally {
+      setDeletePkgTarget(null)
     }
   }
 
@@ -356,7 +362,7 @@ export default function SettingsPage() {
                               <button onClick={() => handleEditPkg(pkg)} className="p-1.5 rounded-lg text-[#737373] hover:text-blue-400 hover:bg-blue-500/10 transition-all">
                                 <PencilSquareIcon className="w-4 h-4" />
                               </button>
-                              <button onClick={() => handleDeletePkg(pkg.id)} className="p-1.5 rounded-lg text-[#737373] hover:text-red-400 hover:bg-red-500/10 transition-all">
+                              <button onClick={() => setDeletePkgTarget(pkg.id)} className="p-1.5 rounded-lg text-[#737373] hover:text-red-400 hover:bg-red-500/10 transition-all">
                                 <TrashIcon className="w-4 h-4" />
                               </button>
                             </>
@@ -371,6 +377,15 @@ export default function SettingsPage() {
           )}
         </div>
       )}
+      <ConfirmModal
+        open={!!deletePkgTarget}
+        onClose={() => setDeletePkgTarget(null)}
+        onConfirm={handleDeletePkg}
+        title="Delete Package"
+        message="Are you sure you want to delete this coin package?"
+        confirmLabel="Delete"
+        confirmVariant="danger"
+      />
     </div>
   )
 }

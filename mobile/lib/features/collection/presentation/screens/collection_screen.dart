@@ -150,7 +150,7 @@ class _CollectionScreenState extends ConsumerState<CollectionScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Xatolik: $e'), backgroundColor: Colors.red),
+              content: const Text('Amaliyot bajarilmadi'), backgroundColor: Colors.red),
         );
       }
     }

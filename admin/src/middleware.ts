@@ -12,8 +12,14 @@ export default withAuth(
     }
 
     // Super admin only routes
-    const superAdminRoutes = ['/settings', '/admins']
-    if (superAdminRoutes.some((r) => path.startsWith(r)) && token?.role !== 'super_admin') {
+    const superAdminRoutes = ['/settings', '/admins', '/payouts', '/revenue', '/risk', '/deletions']
+    if (superAdminRoutes.some((r) => path.startsWith(r)) && token?.role !== 'super_admin' && token?.role !== 'admin') {
+      return NextResponse.redirect(new URL('/', req.url))
+    }
+
+    // Admin-level routes (block support/moderator)
+    const adminRoutes = ['/wallets', '/withdrawals']
+    if (adminRoutes.some((r) => path.startsWith(r)) && !['super_admin', 'admin'].includes(token?.role as string)) {
       return NextResponse.redirect(new URL('/', req.url))
     }
 

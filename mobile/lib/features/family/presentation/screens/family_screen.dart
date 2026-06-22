@@ -334,7 +334,7 @@ class _FamilyScreenState extends ConsumerState<FamilyScreen>
                   } catch (e) {
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                        SnackBar(content: Text('Operation failed. Please try again.'), backgroundColor: Colors.red),
                       );
                     }
                   }
@@ -400,7 +400,7 @@ class _FamilyScreenState extends ConsumerState<FamilyScreen>
                 }
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Operation failed. Please try again.'), backgroundColor: Colors.red));
                 }
               }
             },
@@ -444,7 +444,7 @@ class _FamilyScreenState extends ConsumerState<FamilyScreen>
                 }
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Operation failed. Please try again.'), backgroundColor: Colors.red));
                 }
               }
             },

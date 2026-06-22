@@ -292,7 +292,7 @@ class _AgencyScreenState extends ConsumerState<AgencyScreen>
                   _load();
                 }
               } catch (e) {
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Operation failed. Please try again.'), backgroundColor: Colors.red));
               }
             },
             child: const Text('Create'),

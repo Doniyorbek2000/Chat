@@ -106,7 +106,7 @@ class _VipScreenState extends ConsumerState<VipScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Xatolik: $e'), backgroundColor: Colors.red),
+              content: const Text('Amaliyot bajarilmadi'), backgroundColor: Colors.red),
         );
       }
     } finally {

@@ -71,7 +71,7 @@ class _RoomSettingsSheetState extends ConsumerState<RoomSettingsSheet> {
         );
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: AppColors.error));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Operation failed. Please try again.'), backgroundColor: AppColors.error));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -88,7 +88,7 @@ class _RoomSettingsSheetState extends ConsumerState<RoomSettingsSheet> {
         );
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: AppColors.error));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Operation failed. Please try again.'), backgroundColor: AppColors.error));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -103,7 +103,7 @@ class _RoomSettingsSheetState extends ConsumerState<RoomSettingsSheet> {
       _keywordCtrl.clear();
       await _load();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: AppColors.error));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Operation failed. Please try again.'), backgroundColor: AppColors.error));
     }
   }
 
@@ -113,7 +113,7 @@ class _RoomSettingsSheetState extends ConsumerState<RoomSettingsSheet> {
       await api.delete('/rooms/${widget.roomId}/keywords/$kw');
       await _load();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: AppColors.error));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Operation failed. Please try again.'), backgroundColor: AppColors.error));
     }
   }
 

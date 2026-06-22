@@ -185,11 +185,14 @@ export class WalletService {
       throw new BadRequestException('Cannot transfer to yourself');
 
     if (currency === Currency.COINS) {
-      const wallet = await this.prisma.wallet.findUnique({
-        where: { userId: senderId },
-      });
-      if (!wallet || wallet.coins < BigInt(amount))
+      const [senderWallet, receiverWallet] = await Promise.all([
+        this.prisma.wallet.findUnique({ where: { userId: senderId } }),
+        this.prisma.wallet.findUnique({ where: { userId: receiver.id } }),
+      ]);
+      if (!senderWallet || senderWallet.coins < BigInt(amount))
         throw new BadRequestException('Insufficient coins');
+
+      const receiverCoins = receiverWallet?.coins ?? BigInt(0);
 
       await this.prisma.$transaction([
         this.prisma.wallet.update({
@@ -206,8 +209,8 @@ export class WalletService {
             type: TransactionType.TRANSFER,
             currency,
             amount: -BigInt(amount),
-            balanceBefore: wallet.coins,
-            balanceAfter: wallet.coins - BigInt(amount),
+            balanceBefore: senderWallet.coins,
+            balanceAfter: senderWallet.coins - BigInt(amount),
             description: `Transfer to ${receiverUid}`,
             referenceId: receiver.id,
             status: TransactionStatus.COMPLETED,
@@ -219,8 +222,8 @@ export class WalletService {
             type: TransactionType.TRANSFER,
             currency,
             amount: BigInt(amount),
-            balanceBefore: BigInt(0),
-            balanceAfter: BigInt(amount),
+            balanceBefore: receiverCoins,
+            balanceAfter: receiverCoins + BigInt(amount),
             description: `Received from sender`,
             referenceId: senderId,
             status: TransactionStatus.COMPLETED,
@@ -247,14 +250,23 @@ export class WalletService {
   }
 
   async requestWithdrawal(userId: string, dto: WithdrawDto) {
+    const dedupeKey = `withdraw:${userId}`;
+    const locked = await this.redis.set(dedupeKey, '1', 'EX', 10, 'NX');
+    if (!locked) throw new BadRequestException('Request already processing');
+
     const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
     const MIN_WITHDRAW = 100;
+    const MAX_WITHDRAW = 10000000;
 
     if (!wallet || wallet.diamonds < BigInt(dto.amount))
       throw new BadRequestException('Insufficient diamonds');
     if (dto.amount < MIN_WITHDRAW)
       throw new BadRequestException(
         `Minimum withdrawal is ${MIN_WITHDRAW} diamonds`,
+      );
+    if (dto.amount > MAX_WITHDRAW)
+      throw new BadRequestException(
+        `Maximum withdrawal is ${MAX_WITHDRAW} diamonds`,
       );
 
     const pendingCount = await this.prisma.withdrawal.count({

@@ -17,7 +17,7 @@ interface AuthSocket extends Socket {
 }
 
 @WebSocketGateway({
-  cors: { origin: '*', credentials: true },
+  cors: { origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim()) : [], credentials: true },
   namespace: '/chat',
   transports: ['websocket', 'polling'],
 })

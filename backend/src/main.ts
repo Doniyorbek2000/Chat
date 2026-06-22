@@ -30,8 +30,9 @@ async function bootstrap() {
   app.use(compression());
 
   // CORS
+  const corsOrigins = configService.get<string>('app.corsOrigin');
   app.enableCors({
-    origin: configService.get<string>('app.corsOrigin')?.split(',') || '*',
+    origin: corsOrigins ? corsOrigins.split(',').map((o) => o.trim()) : [],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
@@ -78,9 +79,11 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
+  app.enableShutdownHooks();
+
   await app.listen(port);
-  logger.log(`🚀 VOXO Backend running on port ${port}`);
-  logger.log(`📖 Swagger docs: http://localhost:${port}/api/docs`);
+  logger.log(`VOXO Backend running on port ${port}`);
+  logger.log(`Swagger docs: http://localhost:${port}/api/docs`);
 }
 
 bootstrap();

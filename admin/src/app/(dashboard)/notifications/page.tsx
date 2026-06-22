@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/lib/api'
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { ConfirmModal } from '@/components/ui/Modal'
+import toast from 'react-hot-toast'
 
 interface NotifCategory {
   id: string
@@ -53,14 +55,17 @@ export default function NotificationsPage() {
     finally { setSaving(false) }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("O'chirishni tasdiqlaysizmi?")) return
-    setDeletingId(id)
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeletingId(deleteTarget)
     try {
-      await api.deleteNotificationCategory(id)
-      setCategories(c => c.filter(cat => cat.id !== id))
-    } catch (e) { console.error(e) }
-    finally { setDeletingId(null) }
+      await api.deleteNotificationCategory(deleteTarget)
+      setCategories(c => c.filter(cat => cat.id !== deleteTarget))
+      toast.success('Category deleted')
+    } catch (e: any) { toast.error(e.message || 'Failed to delete') }
+    finally { setDeletingId(null); setDeleteTarget(null) }
   }
 
   return (
@@ -130,7 +135,7 @@ export default function NotificationsPage() {
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1">
                       <button onClick={() => { setEditItem(cat); setForm({ key: cat.key, label: cat.label, icon: cat.icon ?? '', sortOrder: String(cat.sortOrder), isActive: cat.isActive }); setShowForm(true) }} className="p-1.5 text-dark-400 hover:text-white rounded-lg hover:bg-white/5"><PencilIcon className="w-4 h-4" /></button>
-                      <button onClick={() => handleDelete(cat.id)} disabled={deletingId === cat.id} className="p-1.5 text-dark-400 hover:text-red-400 rounded-lg hover:bg-red-500/10 disabled:opacity-50"><TrashIcon className="w-4 h-4" /></button>
+                      <button onClick={() => setDeleteTarget(cat.id)} disabled={deletingId === cat.id} className="p-1.5 text-dark-400 hover:text-red-400 rounded-lg hover:bg-red-500/10 disabled:opacity-50"><TrashIcon className="w-4 h-4" /></button>
                     </div>
                   </td>
                 </tr>
@@ -139,6 +144,16 @@ export default function NotificationsPage() {
           </table>
         </div>
       )}
+      <ConfirmModal
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="Delete Category"
+        message="Are you sure you want to delete this notification category?"
+        confirmLabel="Delete"
+        confirmVariant="danger"
+        loading={!!deletingId}
+      />
     </div>
   )
 }

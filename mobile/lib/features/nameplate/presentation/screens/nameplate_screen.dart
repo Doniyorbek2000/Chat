@@ -141,7 +141,7 @@ class _NameplateScreenState extends ConsumerState<NameplateScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Xatolik: $e'), backgroundColor: Colors.red),
+              content: const Text('Amaliyot bajarilmadi'), backgroundColor: Colors.red),
         );
       }
     }
@@ -178,7 +178,7 @@ class _NameplateScreenState extends ConsumerState<NameplateScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Xatolik: $e'), backgroundColor: Colors.red),
+              content: const Text('Amaliyot bajarilmadi'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -205,7 +205,7 @@ class _NameplateScreenState extends ConsumerState<NameplateScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Xatolik: $e'), backgroundColor: Colors.red),
+              content: const Text('Amaliyot bajarilmadi'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -232,7 +232,7 @@ class _NameplateScreenState extends ConsumerState<NameplateScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Xatolik: $e'), backgroundColor: Colors.red),
+              content: const Text('Amaliyot bajarilmadi'), backgroundColor: Colors.red),
         );
       }
     } finally {

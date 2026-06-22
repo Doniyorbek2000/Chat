@@ -55,7 +55,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Xatolik: $e"),
+            content: const Text('Amaliyot bajarilmadi'),
             backgroundColor: AppColors.error,
           ),
         );
