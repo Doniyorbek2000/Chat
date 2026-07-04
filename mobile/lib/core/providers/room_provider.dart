@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
+import '../config/app_config.dart';
 import '../models/room_model.dart';
 import '../models/gift_model.dart';
 import '../network/api_client.dart';
 import '../network/socket_client.dart';
 import '../constants/api_constants.dart';
+import '../services/zegocloud_service.dart';
 import 'auth_provider.dart';
 
 class RoomState {
@@ -17,6 +20,8 @@ class RoomState {
   final List<GiftEventModel> activeGifts;
   final String? error;
   final bool isChatOpen;
+  final VoiceConnectionState voiceState;
+  final Map<String, double> speakingLevels;
 
   const RoomState({
     this.room,
@@ -28,6 +33,8 @@ class RoomState {
     this.activeGifts = const [],
     this.error,
     this.isChatOpen = false,
+    this.voiceState = VoiceConnectionState.disconnected,
+    this.speakingLevels = const {},
   });
 
   RoomState copyWith({
@@ -36,32 +43,38 @@ class RoomState {
     bool? isMicOn,
     bool? isInRoom,
     int? mySeatIndex,
+    bool clearSeatIndex = false,
     List<RoomMessageModel>? messages,
     List<GiftEventModel>? activeGifts,
     String? error,
     bool? isChatOpen,
+    VoiceConnectionState? voiceState,
+    Map<String, double>? speakingLevels,
   }) {
     return RoomState(
       room: room ?? this.room,
       isLoading: isLoading ?? this.isLoading,
       isMicOn: isMicOn ?? this.isMicOn,
       isInRoom: isInRoom ?? this.isInRoom,
-      mySeatIndex: mySeatIndex ?? this.mySeatIndex,
+      mySeatIndex: clearSeatIndex ? null : (mySeatIndex ?? this.mySeatIndex),
       messages: messages ?? this.messages,
       activeGifts: activeGifts ?? this.activeGifts,
       error: error ?? this.error,
       isChatOpen: isChatOpen ?? this.isChatOpen,
+      voiceState: voiceState ?? this.voiceState,
+      speakingLevels: speakingLevels ?? this.speakingLevels,
     );
   }
 
-  bool get isHost =>
-      room != null && room!.host.id == room!.host.id; // override in notifier
+  bool get isOnSeat => mySeatIndex != null;
+  bool get isVoiceConnected => voiceState == VoiceConnectionState.connected;
 }
 
 class RoomNotifier extends StateNotifier<RoomState> {
   final ApiClient _apiClient;
   final Ref _ref;
   final List<StreamSubscription> _subscriptions = [];
+  final ZegocloudService _voice = ZegocloudService();
 
   RoomNotifier(this._apiClient, this._ref) : super(const RoomState());
 
@@ -75,7 +88,24 @@ class RoomNotifier extends StateNotifier<RoomState> {
         },
       );
 
-      final room = RoomModel.fromJson(response.data as Map<String, dynamic>);
+      // Backend returns { room, token: { token, expiresAt } }.
+      final data = response.data as Map<String, dynamic>;
+      final roomJson = (data['room'] ?? data) as Map<String, dynamic>;
+      final zegoToken =
+          (data['token'] as Map<String, dynamic>?)?['token'] as String?;
+
+      // The join payload is a bare room row; fetch the full room
+      // (host, seats, recent messages) from the detail endpoint.
+      RoomModel room;
+      try {
+        final detail = await _apiClient.get(
+          ApiConstants.roomById.replaceFirst('{id}', roomId),
+        );
+        room = RoomModel.fromJson(detail.data as Map<String, dynamic>);
+      } catch (_) {
+        room = RoomModel.fromJson(roomJson);
+      }
+
       state = RoomState(
         room: room,
         isLoading: false,
@@ -86,6 +116,10 @@ class RoomNotifier extends StateNotifier<RoomState> {
 
       SocketClient.instance.joinRoom(roomId);
       _setupSocketListeners(roomId);
+
+      // Connect the real audio channel. Failure is non-fatal: the user can
+      // still see the room, chat and send gifts.
+      await _connectVoice(roomId, zegoToken);
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
@@ -97,6 +131,8 @@ class RoomNotifier extends StateNotifier<RoomState> {
   Future<void> leaveRoom() async {
     final roomId = state.room?.id;
     if (roomId == null) return;
+
+    await _voice.leaveRoom();
 
     try {
       await _apiClient.post(
@@ -113,6 +149,15 @@ class RoomNotifier extends StateNotifier<RoomState> {
     final roomId = state.room?.id;
     if (roomId == null) return;
 
+    // Speaking requires the microphone — ask before occupying the seat.
+    final permission = await Permission.microphone.request();
+    if (!permission.isGranted) {
+      state = state.copyWith(
+        error: 'Microphone permission is required to take a seat',
+      );
+      return;
+    }
+
     try {
       await _apiClient.post(
         ApiConstants.takeSeat
@@ -120,7 +165,9 @@ class RoomNotifier extends StateNotifier<RoomState> {
             .replaceFirst('{seatIndex}', seatIndex.toString()),
       );
       SocketClient.instance.takeSeat(roomId, seatIndex);
-      state = state.copyWith(mySeatIndex: seatIndex);
+
+      await _startSpeaking();
+      state = state.copyWith(mySeatIndex: seatIndex, isMicOn: true);
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }
@@ -128,24 +175,33 @@ class RoomNotifier extends StateNotifier<RoomState> {
 
   Future<void> leaveSeat() async {
     final roomId = state.room?.id;
-    if (roomId == null) return;
+    final seatIndex = state.mySeatIndex;
+    if (roomId == null || seatIndex == null) return;
 
     try {
       await _apiClient.post(
-        ApiConstants.leaveSeat.replaceFirst('{id}', roomId),
+        ApiConstants.leaveSeat
+            .replaceFirst('{id}', roomId)
+            .replaceFirst('{seatIndex}', seatIndex.toString()),
       );
       SocketClient.instance.leaveSeat(roomId);
-      state = state.copyWith(mySeatIndex: null);
+      await _voice.stopPublishing();
+      state = state.copyWith(clearSeatIndex: true, isMicOn: false);
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }
   }
 
-  void toggleMic() {
+  Future<void> toggleMic() async {
     final roomId = state.room?.id;
     if (roomId == null) return;
+    // Only seated users have a microphone to toggle.
+    if (!state.isOnSeat) return;
 
     final newMicState = !state.isMicOn;
+    try {
+      await _voice.setMicrophoneMuted(!newMicState);
+    } catch (_) {}
     state = state.copyWith(isMicOn: newMicState);
     SocketClient.instance.toggleMic(roomId, newMicState);
   }
@@ -167,12 +223,90 @@ class RoomNotifier extends StateNotifier<RoomState> {
     state = state.copyWith(activeGifts: updatedGifts);
   }
 
+  // ==================== voice (ZEGOCLOUD) ====================
+
+  Future<void> _connectVoice(String roomId, String? token) async {
+    if (token == null) return;
+    if (!AppConfig.isVoiceConfigured) return;
+
+    final user = _ref.read(authProvider).user;
+    if (user == null) return;
+
+    try {
+      await _voice.initialize(appId: AppConfig.zegoAppId);
+
+      _voice.onStateChanged = (voiceState) {
+        if (!mounted) return;
+        state = state.copyWith(voiceState: voiceState);
+      };
+      _voice.onTokenWillExpire = (rid) => _renewVoiceToken(rid);
+      _voice.onSpeakingLevels = _handleSpeakingLevels;
+
+      await _voice.joinRoom(
+        roomId: roomId,
+        userId: user.id,
+        userName: user.displayName,
+        token: token,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      state = state.copyWith(voiceState: VoiceConnectionState.failed);
+    }
+  }
+
+  Future<void> _startSpeaking() async {
+    if (!_voice.isInRoom) {
+      // Voice channel may have failed on join — retry with a fresh token.
+      final roomId = state.room?.id;
+      if (roomId != null) {
+        final token = await _fetchVoiceToken(roomId);
+        await _connectVoice(roomId, token);
+      }
+    }
+    await _voice.startPublishing();
+  }
+
+  Future<String?> _fetchVoiceToken(String roomId) async {
+    try {
+      final response = await _apiClient.post(
+        ApiConstants.zegoToken.replaceFirst('{id}', roomId),
+      );
+      final data = response.data as Map<String, dynamic>;
+      return (data['token'] as Map<String, dynamic>?)?['token'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _renewVoiceToken(String roomId) async {
+    final token = await _fetchVoiceToken(roomId);
+    if (token != null) {
+      await _voice.renewToken(token);
+    }
+  }
+
+  void _handleSpeakingLevels(Map<String, double> levels) {
+    if (!mounted) return;
+    final merged = Map<String, double>.from(state.speakingLevels)
+      ..addAll(levels);
+    merged.removeWhere((_, level) => level < 1);
+    state = state.copyWith(speakingLevels: merged);
+  }
+
+  // ==================== socket listeners ====================
+
   void _setupSocketListeners(String roomId) {
     final socket = SocketClient.instance;
 
     _subscriptions.add(
       socket.onSeatUpdate.listen((data) {
         _handleSeatUpdate(data);
+      }),
+    );
+
+    _subscriptions.add(
+      socket.onMicUpdate.listen((data) {
+        _handleMicUpdate(data);
       }),
     );
 
@@ -242,6 +376,17 @@ class RoomNotifier extends StateNotifier<RoomState> {
     );
   }
 
+  /// Host/admin muted someone (room:muted). If it's us, silence the real mic.
+  void _handleMicUpdate(Map<String, dynamic> data) {
+    final myId = _ref.read(authProvider).user?.id;
+    final targetId = data['userId'] as String?;
+    final muted = data['muted'] as bool?;
+    if (myId == null || targetId != myId || muted == null) return;
+
+    _voice.setMicrophoneMuted(muted).catchError((_) {});
+    state = state.copyWith(isMicOn: !muted);
+  }
+
   void _handleChatMessage(Map<String, dynamic> data) {
     final message = RoomMessageModel.fromJson(data);
     _addMessage(message);
@@ -302,6 +447,7 @@ class RoomNotifier extends StateNotifier<RoomState> {
   @override
   void dispose() {
     _cancelSubscriptions();
+    _voice.leaveRoom();
     super.dispose();
   }
 }
@@ -322,4 +468,14 @@ final roomMessagesProvider = Provider<List<RoomMessageModel>>((ref) {
 
 final activeGiftsProvider = Provider<List<GiftEventModel>>((ref) {
   return ref.watch(roomProvider).activeGifts;
+});
+
+/// Live speaking levels (userId -> 0..100) for seat "speaking" glow.
+final speakingLevelsProvider = Provider<Map<String, double>>((ref) {
+  return ref.watch(roomProvider).speakingLevels;
+});
+
+/// Voice channel connection state, for showing a reconnect banner in UI.
+final voiceStateProvider = Provider<VoiceConnectionState>((ref) {
+  return ref.watch(roomProvider).voiceState;
 });

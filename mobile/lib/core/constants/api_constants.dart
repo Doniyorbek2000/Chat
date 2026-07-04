@@ -38,6 +38,7 @@ class ApiConstants {
   static const String roomById = '/rooms/{id}';
   static const String createRoom = '/rooms';
   static const String joinRoom = '/rooms/{id}/join';
+  static const String zegoToken = '/rooms/{id}/zego-token';
   static const String leaveRoom = '/rooms/{id}/leave';
   static const String roomSeats = '/rooms/{id}/seats';
   static const String takeSeat = '/rooms/{id}/seats/{seatIndex}/take';

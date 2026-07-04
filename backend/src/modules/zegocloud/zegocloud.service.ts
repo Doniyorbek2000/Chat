@@ -51,8 +51,12 @@ export class ZegocloudService {
   }
 
   /**
-   * Generate a ZEGOCLOUD authentication token for a user to join a room.
-   * Uses HMAC-SHA256 with the server secret.
+   * Generate a ZEGOCLOUD Token04 for a user to join a room.
+   *
+   * Implements the official Token04 format (zego_server_assistant):
+   * AES-CBC-encrypted JSON packed as
+   * [expire int64 BE][iv len uint16 BE][iv][cipher len uint16 BE][cipher],
+   * base64-encoded and prefixed with "04".
    */
   generateToken(
     userId: string,
@@ -64,44 +68,62 @@ export class ZegocloudService {
       throw new BadRequestException('ZEGOCLOUD is not configured');
     }
 
+    const key = Buffer.from(this.serverSecret, 'utf8');
+    const algorithmByKeyLength: Record<number, string> = {
+      16: 'aes-128-cbc',
+      24: 'aes-192-cbc',
+      32: 'aes-256-cbc',
+    };
+    const algorithm = algorithmByKeyLength[key.length];
+    if (!algorithm) {
+      throw new BadRequestException(
+        `ZEGOCLOUD server secret must be 16/24/32 bytes, got ${key.length}`,
+      );
+    }
+
     const now = Math.floor(Date.now() / 1000);
     const expireAt = now + expirySeconds;
 
-    // Build the token payload
-    const nonce = crypto.randomBytes(8).toString('hex');
-
-    const tokenPayload = {
-      app_id: this.appId,
-      user_id: userId,
+    // Room-level privileges (used when "token privilege" is enabled in the
+    // ZEGO console; ignored otherwise, so it is always safe to include).
+    const payload = JSON.stringify({
       room_id: roomId,
-      expire_time: expireAt,
-      nonce,
       privilege: {
         1: privileges.loginRoom ? 1 : 0, // LOGIN_ROOM
         2: privileges.publishStream ? 1 : 0, // PUBLISH_STREAM
       },
-    };
+      stream_id_list: null,
+    });
 
-    const payloadStr = JSON.stringify(tokenPayload);
-    const payloadBase64 = Buffer.from(payloadStr).toString('base64');
+    const tokenInfo = JSON.stringify({
+      app_id: this.appId,
+      user_id: userId,
+      nonce: crypto.randomInt(-2147483648, 2147483648),
+      ctime: now,
+      expire: expireAt,
+      payload,
+    });
 
-    // Create HMAC-SHA256 signature
-    const signingContent = `${this.appId}${userId}${roomId}${expireAt}${nonce}`;
-    const signature = crypto
-      .createHmac('sha256', this.serverSecret)
-      .update(signingContent)
-      .digest('hex');
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv(algorithm, key, iv);
+    const encrypted = Buffer.concat([
+      cipher.update(tokenInfo, 'utf8'),
+      cipher.final(),
+    ]);
 
-    // Assemble token: version + payload + signature
-    const tokenData = {
-      ver: 2,
-      expired_time: expireAt,
-      hash: signature,
-      payload: payloadBase64,
-    };
+    const packed = Buffer.alloc(8 + 2 + iv.length + 2 + encrypted.length);
+    let offset = 0;
+    packed.writeBigInt64BE(BigInt(expireAt), offset);
+    offset += 8;
+    packed.writeUInt16BE(iv.length, offset);
+    offset += 2;
+    iv.copy(packed, offset);
+    offset += iv.length;
+    packed.writeUInt16BE(encrypted.length, offset);
+    offset += 2;
+    encrypted.copy(packed, offset);
 
-    const token = Buffer.from(JSON.stringify(tokenData)).toString('base64');
-    const formattedToken = `04${token}`;
+    const formattedToken = `04${packed.toString('base64')}`;
 
     this.logger.debug(
       `Generated ZEGOCLOUD token for user=${userId} room=${roomId} expires=${expireAt}`,

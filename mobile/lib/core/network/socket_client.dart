@@ -120,6 +120,11 @@ class SocketClient {
       _micUpdateController.add(Map<String, dynamic>.from(data));
     });
 
+    // Host/admin muted or unmuted a user (backend: room:muted)
+    _socket!.on('room:muted', (data) {
+      _micUpdateController.add(Map<String, dynamic>.from(data));
+    });
+
     _socket!.on('room:viewer_count', (data) {
       if (data is int) {
         _viewerCountController.add(data);
