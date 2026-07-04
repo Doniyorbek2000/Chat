@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../../../../core/providers/auth_provider.dart';
@@ -95,6 +96,34 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
       setState(() => _isLoading = false);
       if (mounted) {
         AppUtils.showErrorSnackBar(context, 'Google sign in failed');
+      }
+    }
+  }
+
+  Future<void> _facebookSignIn() async {
+    setState(() => _isLoading = true);
+    try {
+      final result = await FacebookAuth.instance.login(
+        permissions: ['email', 'public_profile'],
+      );
+      if (result.status != LoginStatus.success ||
+          result.accessToken == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      final success = await ref
+          .read(authProvider.notifier)
+          .loginWithFacebook(result.accessToken!.token);
+      setState(() => _isLoading = false);
+
+      if (success && mounted) {
+        context.go(AppRoutes.home);
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        AppUtils.showErrorSnackBar(context, 'Facebook sign in failed');
       }
     }
   }
@@ -435,6 +464,27 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
           iconColor: Colors.white,
           backgroundColor: const Color(0xFF4285F4),
           onPressed: _isLoading ? null : _googleSignIn,
+        ),
+
+        // Facebook
+        const SizedBox(height: 12),
+        _SocialButton(
+          label: 'Continue with Facebook',
+          icon: Icons.facebook_rounded,
+          iconColor: Colors.white,
+          backgroundColor: const Color(0xFF1877F2),
+          onPressed: _isLoading ? null : _facebookSignIn,
+        ),
+
+        // Email
+        const SizedBox(height: 12),
+        _SocialButton(
+          label: 'Continue with Email',
+          icon: Icons.email_outlined,
+          iconColor: Colors.white,
+          backgroundColor: AppColors.cardDark,
+          onPressed:
+              _isLoading ? null : () => context.push(AppRoutes.emailLogin),
         ),
 
         // Apple (iOS only)

@@ -16,6 +16,12 @@ import {
   AppleAuthDto,
   RefreshTokenDto,
   GuestLoginDto,
+  EmailRegisterDto,
+  EmailLoginDto,
+  EmailVerifyDto,
+  EmailResendDto,
+  FacebookAuthDto,
+  TelegramAuthDto,
 } from './dto/auth.dto';
 import { Public } from '../../common/decorators/public.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -72,6 +78,64 @@ export class AuthController {
       dto.familyName,
       dto.deviceId,
     );
+  }
+
+  @Public()
+  @Post('email/register')
+  @ApiOperation({ summary: 'Register with email and password' })
+  async registerWithEmail(@Body() dto: EmailRegisterDto) {
+    return this.authService.registerWithEmail(
+      dto.email,
+      dto.password,
+      dto.displayName,
+      dto.deviceId,
+      dto.referralCode,
+    );
+  }
+
+  @Public()
+  @Post('email/login')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login with email and password' })
+  async loginWithEmail(@Body() dto: EmailLoginDto) {
+    return this.authService.loginWithEmail(dto.email, dto.password, dto.deviceId);
+  }
+
+  @Public()
+  @Post('email/verify')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify email with the emailed code' })
+  async verifyEmail(@Body() dto: EmailVerifyDto) {
+    return this.authService.verifyEmail(dto.email, dto.code);
+  }
+
+  @Public()
+  @Post('email/resend')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Resend the email verification code' })
+  async resendEmailCode(@Body() dto: EmailResendDto) {
+    return this.authService.resendEmailCode(dto.email);
+  }
+
+  @Public()
+  @Post('facebook')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login with Facebook' })
+  async loginWithFacebook(@Body() dto: FacebookAuthDto) {
+    return this.authService.loginWithFacebook(
+      dto.accessToken,
+      dto.deviceId,
+      dto.referralCode,
+    );
+  }
+
+  @Public()
+  @Post('telegram')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login with Telegram (Login Widget payload)' })
+  async loginWithTelegram(@Body() dto: TelegramAuthDto) {
+    const { deviceId, referralCode, ...payload } = dto;
+    return this.authService.loginWithTelegram(payload, deviceId, referralCode);
   }
 
   @Public()

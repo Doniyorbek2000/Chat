@@ -12,9 +12,11 @@ import { InjectRedis } from '@nestjs-modules/ioredis';
 import { Redis } from 'ioredis';
 import { v4 as uuidv4 } from 'uuid';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import axios from 'axios';
 import { OAuth2Client } from 'google-auth-library';
 import { SmsService } from '../sms/sms.service';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class AuthService {
@@ -26,6 +28,7 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private smsService: SmsService,
+    private mailService: MailService,
     @InjectRedis() private redis: Redis,
   ) {
     this.googleClient = new OAuth2Client(configService.get('google.clientId'));
@@ -292,6 +295,362 @@ export class AuthService {
         where: { id: user.id },
         data: {
           appleId: appleId || user.appleId,
+          lastSeen: new Date(),
+          isOnline: true,
+          ...(deviceId && { deviceId }),
+        },
+      });
+    }
+
+    const tokens = await this.generateTokens(user.id, user.uid, user.role);
+    return { user, ...tokens };
+  }
+
+  // ==================== EMAIL AUTH ====================
+
+  private async generateUniqueUid(): Promise<string> {
+    let uid = this.generateUid();
+    while (await this.prisma.user.findUnique({ where: { uid } })) {
+      uid = this.generateUid();
+    }
+    return uid;
+  }
+
+  private generateReferralCode(): string {
+    return `VOXO${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+  }
+
+  private async sendEmailVerificationCode(email: string): Promise<void> {
+    const attempts = await this.redis.get(`email_code_attempts:${email}`);
+    if (attempts && parseInt(attempts) >= 5) {
+      throw new BadRequestException(
+        'Too many verification requests. Please try again after 1 hour.',
+      );
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    await this.redis.set(`email_code:${email}`, code, 'EX', 15 * 60);
+    await this.redis.incr(`email_code_attempts:${email}`);
+    await this.redis.expire(`email_code_attempts:${email}`, 3600);
+
+    await this.mailService.sendVerificationCode(email, code);
+
+    if (!this.mailService.isConfigured) {
+      // Local development only: surface the code since no email goes out
+      this.logger.debug(`[DEV] email verification code for ${email}: ${code}`);
+    }
+  }
+
+  async registerWithEmail(
+    email: string,
+    password: string,
+    displayName?: string,
+    deviceId?: string,
+    referralCode?: string,
+  ) {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const existing = await this.prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+    if (existing) {
+      throw new ConflictException('An account with this email already exists');
+    }
+
+    let referredByUser = null;
+    if (referralCode) {
+      referredByUser = await this.prisma.user.findUnique({
+        where: { referralCode },
+      });
+    }
+
+    const uid = await this.generateUniqueUid();
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // Without SMTP there is no way to deliver a code — activate directly
+    const autoVerify = !this.mailService.isConfigured;
+
+    const user = await this.prisma.user.create({
+      data: {
+        email: normalizedEmail,
+        passwordHash,
+        emailVerified: autoVerify,
+        displayName: displayName || `User${uid.substring(4, 9)}`,
+        uid,
+        referralCode: this.generateReferralCode(),
+        referredBy: referredByUser?.id,
+        deviceId,
+        wallet: { create: {} },
+      },
+    });
+
+    if (autoVerify) {
+      const tokens = await this.generateTokens(user.id, user.uid, user.role);
+      return { user, ...tokens, requiresVerification: false };
+    }
+
+    await this.sendEmailVerificationCode(normalizedEmail);
+    return {
+      requiresVerification: true,
+      message: 'Verification code sent to your email',
+    };
+  }
+
+  async verifyEmail(email: string, code: string) {
+    const normalizedEmail = email.trim().toLowerCase();
+    const storedCode = await this.redis.get(`email_code:${normalizedEmail}`);
+
+    if (!storedCode) {
+      throw new BadRequestException('Verification code expired or not found');
+    }
+    if (storedCode !== code) {
+      throw new BadRequestException('Invalid verification code');
+    }
+
+    await this.redis.del(`email_code:${normalizedEmail}`);
+    await this.redis.del(`email_code_attempts:${normalizedEmail}`);
+
+    const user = await this.prisma.user.update({
+      where: { email: normalizedEmail },
+      data: { emailVerified: true, lastSeen: new Date(), isOnline: true },
+    });
+
+    const tokens = await this.generateTokens(user.id, user.uid, user.role);
+    return { user, ...tokens };
+  }
+
+  async resendEmailCode(email: string) {
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+    if (!user || user.emailVerified) {
+      // Don't leak which emails are registered/unverified
+      return { message: 'If the account exists, a code has been sent' };
+    }
+
+    await this.sendEmailVerificationCode(normalizedEmail);
+    return { message: 'If the account exists, a code has been sent' };
+  }
+
+  async loginWithEmail(email: string, password: string, deviceId?: string) {
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (!user || !user.passwordHash) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    const passwordValid = await bcrypt.compare(password, user.passwordHash);
+    if (!passwordValid) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    if (!user.emailVerified) {
+      await this.sendEmailVerificationCode(normalizedEmail);
+      throw new UnauthorizedException(
+        'Email not verified. A new verification code has been sent.',
+      );
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        lastSeen: new Date(),
+        isOnline: true,
+        ...(deviceId && { deviceId }),
+      },
+    });
+
+    const tokens = await this.generateTokens(user.id, user.uid, user.role);
+    return { user: updated, ...tokens };
+  }
+
+  // ==================== FACEBOOK AUTH ====================
+
+  async loginWithFacebook(
+    accessToken: string,
+    deviceId?: string,
+    referralCode?: string,
+  ) {
+    const appSecret = this.configService.get<string>('facebook.appSecret');
+
+    let profile: {
+      id: string;
+      name?: string;
+      email?: string;
+      picture?: { data?: { url?: string } };
+    };
+
+    try {
+      const params: Record<string, string> = {
+        fields: 'id,name,email,picture.width(200).height(200)',
+        access_token: accessToken,
+      };
+      // appsecret_proof hardens Graph calls against stolen tokens
+      if (appSecret) {
+        params.appsecret_proof = crypto
+          .createHmac('sha256', appSecret)
+          .update(accessToken)
+          .digest('hex');
+      }
+
+      const response = await axios.get('https://graph.facebook.com/v19.0/me', {
+        params,
+        timeout: 10000,
+      });
+      profile = response.data;
+    } catch {
+      throw new UnauthorizedException('Invalid Facebook token');
+    }
+
+    if (!profile?.id) {
+      throw new UnauthorizedException('Failed to get Facebook user info');
+    }
+
+    const facebookId = profile.id;
+    const email = profile.email?.toLowerCase();
+
+    let user = await this.prisma.user.findFirst({
+      where: { OR: [{ facebookId }, ...(email ? [{ email }] : [])] },
+    });
+
+    if (!user) {
+      let referredByUser = null;
+      if (referralCode) {
+        referredByUser = await this.prisma.user.findUnique({
+          where: { referralCode },
+        });
+      }
+
+      const uid = await this.generateUniqueUid();
+      user = await this.prisma.user.create({
+        data: {
+          facebookId,
+          email,
+          emailVerified: Boolean(email),
+          displayName: profile.name || `User${uid.substring(4, 9)}`,
+          avatar: profile.picture?.data?.url,
+          uid,
+          referralCode: this.generateReferralCode(),
+          referredBy: referredByUser?.id,
+          isVerified: true,
+          deviceId,
+          wallet: { create: {} },
+        },
+      });
+    } else {
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          facebookId: user.facebookId || facebookId,
+          lastSeen: new Date(),
+          isOnline: true,
+          ...(deviceId && { deviceId }),
+        },
+      });
+    }
+
+    const tokens = await this.generateTokens(user.id, user.uid, user.role);
+    return { user, ...tokens };
+  }
+
+  // ==================== TELEGRAM AUTH ====================
+
+  /**
+   * Login with the payload of the Telegram Login Widget
+   * (https://core.telegram.org/widgets/login). The payload is signed by
+   * Telegram with HMAC-SHA256 using SHA256(bot_token) as the key.
+   */
+  async loginWithTelegram(
+    payload: {
+      id: string | number;
+      first_name?: string;
+      last_name?: string;
+      username?: string;
+      photo_url?: string;
+      auth_date: string | number;
+      hash: string;
+    },
+    deviceId?: string,
+    referralCode?: string,
+  ) {
+    const botToken = this.configService.get<string>('telegram.botToken');
+    if (!botToken) {
+      throw new BadRequestException('Telegram login is not configured');
+    }
+
+    const { hash, ...fields } = payload;
+    if (!hash || !fields.id || !fields.auth_date) {
+      throw new UnauthorizedException('Invalid Telegram payload');
+    }
+
+    // Build data_check_string: sorted key=value lines of all fields but hash
+    const dataCheckString = Object.keys(fields)
+      .filter((key) => fields[key] !== undefined && fields[key] !== null)
+      .sort()
+      .map((key) => `${key}=${fields[key]}`)
+      .join('\n');
+
+    const secretKey = crypto.createHash('sha256').update(botToken).digest();
+    const expectedHash = crypto
+      .createHmac('sha256', secretKey)
+      .update(dataCheckString)
+      .digest('hex');
+
+    const hashesMatch =
+      expectedHash.length === hash.length &&
+      crypto.timingSafeEqual(
+        Buffer.from(expectedHash, 'hex'),
+        Buffer.from(hash, 'hex'),
+      );
+    if (!hashesMatch) {
+      throw new UnauthorizedException('Invalid Telegram signature');
+    }
+
+    // Reject stale payloads (older than 24h) to limit replay
+    const authAge = Math.floor(Date.now() / 1000) - Number(fields.auth_date);
+    if (!Number.isFinite(authAge) || authAge > 24 * 60 * 60 || authAge < -300) {
+      throw new UnauthorizedException('Telegram login data is expired');
+    }
+
+    const telegramId = String(fields.id);
+
+    let user = await this.prisma.user.findUnique({ where: { telegramId } });
+
+    if (!user) {
+      let referredByUser = null;
+      if (referralCode) {
+        referredByUser = await this.prisma.user.findUnique({
+          where: { referralCode },
+        });
+      }
+
+      const uid = await this.generateUniqueUid();
+      const displayName =
+        [fields.first_name, fields.last_name].filter(Boolean).join(' ') ||
+        fields.username ||
+        `User${uid.substring(4, 9)}`;
+
+      user = await this.prisma.user.create({
+        data: {
+          telegramId,
+          displayName,
+          avatar: fields.photo_url,
+          uid,
+          referralCode: this.generateReferralCode(),
+          referredBy: referredByUser?.id,
+          isVerified: true,
+          deviceId,
+          wallet: { create: {} },
+        },
+      });
+    } else {
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
           lastSeen: new Date(),
           isOnline: true,
           ...(deviceId && { deviceId }),

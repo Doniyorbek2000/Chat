@@ -17,6 +17,12 @@ class ApiConstants {
   static const String logout = '/auth/logout';
   static const String googleLogin = '/auth/google';
   static const String appleLogin = '/auth/apple';
+  static const String facebookLogin = '/auth/facebook';
+  static const String telegramLogin = '/auth/telegram';
+  static const String emailRegister = '/auth/email/register';
+  static const String emailLogin = '/auth/email/login';
+  static const String emailVerify = '/auth/email/verify';
+  static const String emailResend = '/auth/email/resend';
   static const String guestLogin = '/auth/guest';
 
   // Users
