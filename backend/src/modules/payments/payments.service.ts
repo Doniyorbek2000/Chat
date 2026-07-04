@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
+import { JWT } from 'google-auth-library';
 import { PrismaService } from '../../prisma/prisma.service';
 import { WalletService } from '../wallet/wallet.service';
 import {
@@ -235,6 +236,59 @@ export class PaymentsService {
     }
   }
 
+  /**
+   * Verify a purchase token against the Google Play Developer API
+   * (androidpublisher v3) using the configured service account.
+   * Throws when the purchase is missing, cancelled, or pending.
+   */
+  private async verifyWithGooglePlayApi(
+    packageName: string,
+    productId: string,
+    token: string,
+  ): Promise<void> {
+    const email = this.config.get<string>('googlePlay.serviceAccountEmail');
+    const key = this.config
+      .get<string>('googlePlay.serviceAccountKey')
+      ?.replace(/\\n/g, '\n');
+
+    const client = new JWT({
+      email,
+      key,
+      scopes: ['https://www.googleapis.com/auth/androidpublisher'],
+    });
+
+    const url =
+      `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/` +
+      `${encodeURIComponent(packageName)}/purchases/products/` +
+      `${encodeURIComponent(productId)}/tokens/${encodeURIComponent(token)}`;
+
+    let purchase: { purchaseState?: number };
+    try {
+      const response = await client.request<{ purchaseState?: number }>({ url });
+      purchase = response.data;
+    } catch (error) {
+      const status = error?.response?.status;
+      this.logger.warn(
+        `[GooglePlay] verify failed: productId=${productId} status=${status ?? error.message}`,
+      );
+      throw new BadRequestException('Google Play purchase not found or invalid');
+    }
+
+    // purchaseState: 0 = purchased, 1 = cancelled, 2 = pending
+    if (purchase.purchaseState !== 0) {
+      throw new BadRequestException(
+        `Google Play purchase is not completed (state=${purchase.purchaseState})`,
+      );
+    }
+  }
+
+  private get isGooglePlayConfigured(): boolean {
+    return Boolean(
+      this.config.get<string>('googlePlay.serviceAccountEmail') &&
+        this.config.get<string>('googlePlay.serviceAccountKey'),
+    );
+  }
+
   async verifyGooglePlayPurchase(
     userId: string,
     dto: { token: string; productId: string; packageName: string },
@@ -244,9 +298,13 @@ export class PaymentsService {
     const isDev = this.config.get<string>('app.env') !== 'production';
     const mockVerifyEnabled = this.config.get<string>('GOOGLE_PLAY_MOCK_VERIFY') === 'true';
 
-    if (!isDev && !mockVerifyEnabled) {
-      // Production: verify via Google Play Developer API
-      // Placeholder — wire up googleapis when service account JSON is configured
+    if (this.isGooglePlayConfigured && !mockVerifyEnabled) {
+      // Real verification against the Google Play Developer API
+      const expectedPackage =
+        this.config.get<string>('googlePlay.packageName') || packageName;
+      await this.verifyWithGooglePlayApi(expectedPackage, productId, token);
+    } else if (!isDev) {
+      // Production without a service account: never grant unverified coins
       this.logger.warn(`[GooglePlay] Production verify not configured. productId=${productId}`);
       throw new BadRequestException(
         'Google Play verification not configured in production',

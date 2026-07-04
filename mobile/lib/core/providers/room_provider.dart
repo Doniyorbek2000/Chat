@@ -88,11 +88,14 @@ class RoomNotifier extends StateNotifier<RoomState> {
         },
       );
 
-      // Backend returns { room, token: { token, expiresAt } }.
-      final data = response.data as Map<String, dynamic>;
-      final roomJson = (data['room'] ?? data) as Map<String, dynamic>;
+      // Backend wraps responses as { success, data } and join returns
+      // { room, token: { token, expiresAt } } inside that envelope.
+      final data = _unwrap(response.data);
+      final roomJson = data['room'] is Map
+          ? Map<String, dynamic>.from(data['room'] as Map)
+          : data;
       final zegoToken =
-          (data['token'] as Map<String, dynamic>?)?['token'] as String?;
+          data['token'] is Map ? data['token']['token'] as String? : null;
 
       // The join payload is a bare room row; fetch the full room
       // (host, seats, recent messages) from the detail endpoint.
@@ -101,7 +104,7 @@ class RoomNotifier extends StateNotifier<RoomState> {
         final detail = await _apiClient.get(
           ApiConstants.roomById.replaceFirst('{id}', roomId),
         );
-        room = RoomModel.fromJson(detail.data as Map<String, dynamic>);
+        room = RoomModel.fromJson(_unwrap(detail.data));
       } catch (_) {
         room = RoomModel.fromJson(roomJson);
       }
@@ -271,11 +274,19 @@ class RoomNotifier extends StateNotifier<RoomState> {
       final response = await _apiClient.post(
         ApiConstants.zegoToken.replaceFirst('{id}', roomId),
       );
-      final data = response.data as Map<String, dynamic>;
-      return (data['token'] as Map<String, dynamic>?)?['token'] as String?;
+      final data = _unwrap(response.data);
+      return data['token'] is Map ? data['token']['token'] as String? : null;
     } catch (_) {
       return null;
     }
+  }
+
+  /// Strip the backend's global `{ success, data }` response envelope.
+  Map<String, dynamic> _unwrap(dynamic body) {
+    if (body is Map && body['data'] is Map) {
+      return Map<String, dynamic>.from(body['data'] as Map);
+    }
+    return Map<String, dynamic>.from(body as Map);
   }
 
   Future<void> _renewVoiceToken(String roomId) async {

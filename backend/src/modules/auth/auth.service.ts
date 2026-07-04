@@ -14,6 +14,7 @@ import { v4 as uuidv4 } from 'uuid';
 import * as bcrypt from 'bcrypt';
 import axios from 'axios';
 import { OAuth2Client } from 'google-auth-library';
+import { SmsService } from '../sms/sms.service';
 
 @Injectable()
 export class AuthService {
@@ -24,6 +25,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private smsService: SmsService,
     @InjectRedis() private redis: Redis,
   ) {
     this.googleClient = new OAuth2Client(configService.get('google.clientId'));
@@ -79,10 +81,25 @@ export class AuthService {
 
     // PII-safe log: mask phone and never log OTP in production
     const maskedPhone = phone.replace(/(\+\d{3})\d+(\d{2})$/, '$1****$2');
-    this.logger.log(`OTP sent to ${maskedPhone}`);
 
-    // In production, integrate with SMS provider (Eskiz.uz, Play Mobile, etc.)
-    // await this.smsService.send(phone, `Your VOXO verification code: ${otp}`);
+    try {
+      await this.smsService.send(
+        phone,
+        `Your VOXO verification code: ${otp}. Do not share it with anyone.`,
+      );
+    } catch {
+      // Don't leave the phone rate-limited for a delivery failure
+      await this.redis.del(key);
+      throw new BadRequestException(
+        'Failed to send verification code. Please try again.',
+      );
+    }
+
+    if (!this.smsService.isConfigured) {
+      // Local development only: surface the code in logs since no SMS goes out
+      this.logger.debug(`[DEV] OTP for ${maskedPhone}: ${otp}`);
+    }
+    this.logger.log(`OTP sent to ${maskedPhone}`);
 
     return { message: 'OTP sent successfully' };
   }

@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { SmsService } from '../sms/sms.service';
 
 // ==================== MOCKS ====================
 
@@ -44,6 +45,11 @@ const mockRedis = {
   expire: jest.fn(),
 };
 
+const mockSmsService = {
+  isConfigured: false,
+  send: jest.fn().mockResolvedValue(true),
+};
+
 // ==================== FIXTURES ====================
 
 const mockUser = {
@@ -78,6 +84,7 @@ describe('AuthService', () => {
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: mockConfigService },
+        { provide: SmsService, useValue: mockSmsService },
         {
           provide: 'default_IORedisModuleConnectionToken',
           useValue: mockRedis,

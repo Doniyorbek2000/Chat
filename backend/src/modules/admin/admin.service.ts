@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { WalletService } from '../wallet/wallet.service';
+import { PushService } from '../push/push.service';
 import {
   BanUserDto,
   CreateGiftDto,
@@ -33,6 +34,7 @@ export class AdminService {
   constructor(
     private prisma: PrismaService,
     private walletService: WalletService,
+    private pushService: PushService,
   ) {}
 
   // ==================== DASHBOARD ====================
@@ -501,17 +503,47 @@ export class AdminService {
   async sendBroadcastNotification(dto: BroadcastDto) {
     this.logger.log(`[BROADCAST] title="${dto.title}" body="${dto.body}"`);
 
-    // In production: integrate Firebase Admin SDK to send FCM notifications
-    // For now, create a notification record for all users in batches
-    const userCount = await this.prisma.user.count({
-      where: { isBanned: false },
+    // Persist an in-app notification for every active user, in batches
+    const batchSize = 5000;
+    let created = 0;
+    let cursor: string | undefined;
+
+    for (;;) {
+      const users = await this.prisma.user.findMany({
+        where: { isBanned: false },
+        select: { id: true },
+        orderBy: { id: 'asc' },
+        take: batchSize,
+        ...(cursor && { cursor: { id: cursor }, skip: 1 }),
+      });
+      if (users.length === 0) break;
+      cursor = users[users.length - 1].id;
+
+      const result = await this.prisma.notification.createMany({
+        data: users.map((u) => ({
+          userId: u.id,
+          type: 'broadcast',
+          title: dto.title,
+          body: dto.body,
+        })),
+      });
+      created += result.count;
+
+      if (users.length < batchSize) break;
+    }
+
+    // Deliver FCM pushes to every device with a registered token
+    const { targeted, delivered } = await this.pushService.broadcast({
+      title: dto.title,
+      body: dto.body,
+      data: { type: 'broadcast' },
     });
 
-    this.logger.log(`[BROADCAST] Would send to ${userCount} users`);
-
     return {
-      message: 'Broadcast notification queued',
-      targetUsers: userCount,
+      message: 'Broadcast notification sent',
+      targetUsers: created,
+      pushTargeted: targeted,
+      pushDelivered: delivered,
       title: dto.title,
       body: dto.body,
     };

@@ -5,6 +5,7 @@ import '../network/socket_client.dart';
 import '../storage/secure_storage.dart';
 import '../storage/local_storage.dart';
 import '../constants/api_constants.dart';
+import '../services/notification_service.dart';
 
 enum AuthStatus { initial, loading, authenticated, unauthenticated, error }
 
@@ -223,6 +224,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     state = AuthState(status: AuthStatus.authenticated, user: user);
     await SocketClient.instance.connect();
+
+    // Register this device for push notifications (non-blocking)
+    NotificationService().syncTokenToBackend();
   }
 
   Future<bool> setupProfile({

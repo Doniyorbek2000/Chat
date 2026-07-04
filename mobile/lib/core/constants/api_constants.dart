@@ -24,6 +24,7 @@ class ApiConstants {
   static const String me = '/users/me';
   static const String updateProfile = '/users/me';
   static const String updateAvatar = '/users/me/avatar';
+  static const String updateFcmToken = '/users/me/fcm-token';
   static const String follow = '/users/{uid}/follow';
   static const String unfollow = '/users/{uid}/unfollow';
   static const String followers = '/users/{uid}/followers';

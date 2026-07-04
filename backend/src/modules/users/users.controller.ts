@@ -21,7 +21,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { UsersService } from './users.service';
-import { UpdateProfileDto } from './dto/user.dto';
+import { UpdateProfileDto, UpdateFcmTokenDto } from './dto/user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
@@ -46,6 +46,17 @@ export class UsersController {
     @Body() dto: UpdateProfileDto,
   ) {
     return this.usersService.updateProfile(userId, dto);
+  }
+
+  @Put('me/fcm-token')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Register the device FCM token for push notifications' })
+  async updateFcmToken(
+    @CurrentUser('id') userId: string,
+    @Body() dto: UpdateFcmTokenDto,
+  ) {
+    await this.usersService.updateFcmToken(userId, dto.fcmToken ?? null);
+    return { updated: true };
   }
 
   @Post('me/avatar')

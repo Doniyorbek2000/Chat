@@ -4,6 +4,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import '../constants/api_constants.dart';
+import '../network/api_client.dart';
 
 /// Notification tap action data
 class NotificationTapData {
@@ -319,10 +321,27 @@ class NotificationService {
 
   void _setupTokenRefreshListener() {
     _firebaseMessaging.onTokenRefresh.listen((newToken) {
-      debugPrint('[NotificationService] FCM token refreshed: $newToken');
+      debugPrint('[NotificationService] FCM token refreshed');
       _fcmToken = newToken;
-      // Token should be sent to the backend to update the user's FCM token
+      syncTokenToBackend();
     });
+  }
+
+  /// Register the current FCM token with the backend so the server can
+  /// deliver pushes to this device. Call after login and on token refresh.
+  /// Safe to call when logged out — the request simply fails with 401.
+  Future<void> syncTokenToBackend() async {
+    final token = _fcmToken;
+    if (token == null) return;
+    try {
+      await ApiClient.instance.put(
+        ApiConstants.updateFcmToken,
+        data: {'fcmToken': token},
+      );
+      debugPrint('[NotificationService] FCM token synced to backend');
+    } catch (e) {
+      debugPrint('[NotificationService] FCM token sync failed: $e');
+    }
   }
 
   // ==================== PUBLIC API ====================
