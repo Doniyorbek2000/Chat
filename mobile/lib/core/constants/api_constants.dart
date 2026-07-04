@@ -24,6 +24,7 @@ class ApiConstants {
   static const String me = '/users/me';
   static const String updateProfile = '/users/me';
   static const String updateAvatar = '/users/me/avatar';
+  static const String updateFcmToken = '/users/me/fcm-token';
   static const String follow = '/users/{uid}/follow';
   static const String unfollow = '/users/{uid}/unfollow';
   static const String followers = '/users/{uid}/followers';
@@ -38,6 +39,7 @@ class ApiConstants {
   static const String roomById = '/rooms/{id}';
   static const String createRoom = '/rooms';
   static const String joinRoom = '/rooms/{id}/join';
+  static const String zegoToken = '/rooms/{id}/zego-token';
   static const String leaveRoom = '/rooms/{id}/leave';
   static const String roomSeats = '/rooms/{id}/seats';
   static const String takeSeat = '/rooms/{id}/seats/{seatIndex}/take';

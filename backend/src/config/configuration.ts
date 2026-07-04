@@ -57,6 +57,17 @@ export default () => ({
     privateKey: process.env.FIREBASE_PRIVATE_KEY,
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
   },
+  sms: {
+    eskizEmail: process.env.ESKIZ_EMAIL,
+    eskizPassword: process.env.ESKIZ_PASSWORD,
+    eskizFrom: process.env.ESKIZ_FROM || '4546',
+    eskizBaseUrl: process.env.ESKIZ_BASE_URL || 'https://notify.eskiz.uz/api',
+  },
+  googlePlay: {
+    packageName: process.env.GOOGLE_PLAY_PACKAGE_NAME || 'app.voxo.mobile',
+    serviceAccountEmail: process.env.GOOGLE_PLAY_SA_EMAIL,
+    serviceAccountKey: process.env.GOOGLE_PLAY_SA_PRIVATE_KEY,
+  },
   app: {
     name: 'VOXO',
     version: '1.0.0',

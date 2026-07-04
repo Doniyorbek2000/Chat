@@ -206,8 +206,16 @@ GET  /api/v1/leaderboard       - Get leaderboard
 cd mobile
 flutter pub get
 dart run build_runner build --delete-conflicting-outputs
-flutter run
+flutter run \
+  --dart-define=API_BASE_URL=http://localhost:3000/api/v1 \
+  --dart-define=SOCKET_URL=http://localhost:3000 \
+  --dart-define=ZEGO_APP_ID=your-zegocloud-app-id
 ```
+
+> `ZEGO_APP_ID` is required for live voice in rooms. The app authenticates
+> against ZEGOCLOUD with a Token04 issued by the backend
+> (`POST /api/v1/rooms/:id/zego-token`), so no server secret ships in the app.
+> Without `ZEGO_APP_ID` the app still runs, but rooms are text/gift only.
 
 ### Android
 

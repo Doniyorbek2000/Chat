@@ -16,6 +16,12 @@ class AppConfig {
     defaultValue: 'development',
   );
 
+  /// ZEGOCLOUD App ID. Pass at build time:
+  /// flutter run --dart-define=ZEGO_APP_ID=123456789
+  static const int zegoAppId = int.fromEnvironment('ZEGO_APP_ID');
+
+  static bool get isVoiceConfigured => zegoAppId != 0;
+
   static bool get isProduction => environment == 'production';
   static bool get isDevelopment => environment == 'development';
 }

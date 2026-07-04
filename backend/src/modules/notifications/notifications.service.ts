@@ -2,13 +2,20 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { PushService } from '../push/push.service';
 import { CreateNotificationDto } from './dto/notification.dto';
 
 @Injectable()
 export class NotificationsService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(NotificationsService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private pushService: PushService,
+  ) {}
 
   async getNotifications(userId: string, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
@@ -55,7 +62,23 @@ export class NotificationsService {
   }
 
   async createNotification(dto: CreateNotificationDto) {
-    return this.prisma.notification.create({ data: dto });
+    const notification = await this.prisma.notification.create({ data: dto });
+
+    // Deliver to the user's device; failures must not break the caller
+    this.pushService
+      .sendToUser(dto.userId, {
+        title: dto.title,
+        body: dto.body,
+        data: {
+          notificationId: notification.id,
+          type: dto.type,
+        },
+      })
+      .catch((error) =>
+        this.logger.warn(`Push delivery failed: ${error.message}`),
+      );
+
+    return notification;
   }
 
   async deleteNotification(userId: string, notificationId: string) {

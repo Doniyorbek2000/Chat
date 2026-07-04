@@ -59,6 +59,7 @@ dependencies:
   badges: ^3.1.2
   glassmorphism: ^3.0.0
   in_app_purchase: ^3.1.13
+  zego_express_engine: ^3.14.5
 
 dev_dependencies:
   flutter_test:

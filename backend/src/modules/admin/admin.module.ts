@@ -5,9 +5,16 @@ import { PrismaModule } from '../../prisma/prisma.module';
 import { WalletModule } from '../wallet/wallet.module';
 import { DiscoverModule } from '../discover/discover.module';
 import { ReferralsModule } from '../referrals/referrals.module';
+import { PushModule } from '../push/push.module';
 
 @Module({
-  imports: [PrismaModule, WalletModule, DiscoverModule, ReferralsModule],
+  imports: [
+    PrismaModule,
+    WalletModule,
+    DiscoverModule,
+    ReferralsModule,
+    PushModule,
+  ],
   controllers: [AdminController],
   providers: [AdminService],
 })

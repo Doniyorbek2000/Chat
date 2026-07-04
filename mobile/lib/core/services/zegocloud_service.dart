@@ -1,424 +1,318 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:zego_uikit_prebuilt_live_audio_room/zego_uikit_prebuilt_live_audio_room.dart';
 import 'package:zego_express_engine/zego_express_engine.dart';
 
-/// Represents the current state of a ZEGOCLOUD room connection.
-enum ZegoRoomState {
+/// Connection state of the voice room, decoupled from the SDK's own
+/// `ZegoRoomState` enum to avoid a name clash and keep the UI layer
+/// independent of the SDK.
+enum VoiceConnectionState {
   disconnected,
   connecting,
   connected,
-  reconnecting,
   failed,
 }
 
-/// Callback types for room events.
-typedef RoomStateChangedCallback = void Function(ZegoRoomState state);
-typedef UserJoinedCallback = void Function(List<ZegoUser> users);
-typedef UserLeftCallback = void Function(List<ZegoUser> users);
-typedef NetworkQualityChangedCallback = void Function(int upstreamQuality, int downstreamQuality);
-typedef MicrophoneStateChangedCallback = void Function(String userId, bool isMuted);
+typedef VoiceStateChangedCallback = void Function(VoiceConnectionState state);
+typedef VoiceUsersChangedCallback = void Function(List<String> userIds);
+typedef SpeakingLevelsCallback = void Function(Map<String, double> levelsByUserId);
+typedef TokenWillExpireCallback = void Function(String roomId);
 
-/// ZEGOCLOUD voice room service for Flutter.
-/// Manages room lifecycle, audio streams, and event callbacks.
+/// Real ZEGOCLOUD voice service built on zego_express_engine.
+///
+/// Responsibilities:
+///  - engine lifecycle (token-based auth; the app ships no appSign)
+///  - room login/logout with the Token04 issued by the backend
+///  - publishing the local microphone stream (only while on a seat)
+///  - playing every remote audio stream in the room (without this,
+///    nobody can be heard)
+///  - mute/unmute, speaker routing, sound-level reporting
+///  - token renewal via [onTokenWillExpire]
 class ZegocloudService {
   static final ZegocloudService _instance = ZegocloudService._internal();
   factory ZegocloudService() => _instance;
   ZegocloudService._internal();
 
-  // SDK state
   bool _isInitialized = false;
   bool _isInRoom = false;
-  bool _isLocalAudioMuted = false;
+  bool _isPublishing = false;
+  bool _isMicMuted = false;
   String? _currentRoomId;
   String? _currentUserId;
 
-  // Reconnection state
-  int _reconnectAttempts = 0;
-  static const int _maxReconnectAttempts = 5;
-  Timer? _reconnectTimer;
-  String? _pendingRoomToken;
-  String? _pendingUserName;
+  /// streamId -> userId of remote streams we are currently playing.
+  final Map<String, String> _playingStreams = {};
 
-  // Event callbacks
-  RoomStateChangedCallback? onRoomStateChanged;
-  UserJoinedCallback? onUserJoined;
-  UserLeftCallback? onUserLeft;
-  NetworkQualityChangedCallback? onNetworkQualityChanged;
-  MicrophoneStateChangedCallback? onMicrophoneStateChanged;
+  VoiceConnectionState _state = VoiceConnectionState.disconnected;
 
-  // Internal state tracking
-  ZegoRoomState _roomState = ZegoRoomState.disconnected;
-  ZegoRoomState get roomState => _roomState;
+  VoiceStateChangedCallback? onStateChanged;
+  VoiceUsersChangedCallback? onUsersJoined;
+  VoiceUsersChangedCallback? onUsersLeft;
+  SpeakingLevelsCallback? onSpeakingLevels;
+  TokenWillExpireCallback? onTokenWillExpire;
+
+  VoiceConnectionState get state => _state;
   bool get isInitialized => _isInitialized;
   bool get isInRoom => _isInRoom;
-  bool get isLocalAudioMuted => _isLocalAudioMuted;
+  bool get isPublishing => _isPublishing;
+  bool get isMicMuted => _isMicMuted;
   String? get currentRoomId => _currentRoomId;
 
-  /// Initialize the ZEGOCLOUD Express SDK.
-  /// Must be called before any other SDK operations.
-  Future<void> initialize({
-    required int appId,
-    required String appSign,
-    ZegoScenario scenario = ZegoScenario.StandardVoiceCall,
-  }) async {
-    if (_isInitialized) {
-      debugPrint('[ZegocloudService] SDK already initialized');
-      return;
-    }
-
-    try {
-      // Create SDK engine
-      await ZegoExpressEngine.createEngineWithProfile(
-        ZegoEngineProfile(
-          appId,
-          scenario,
-          appSign: appSign,
-        ),
+  /// Create the Express engine in token-auth mode (no appSign in the app).
+  Future<void> initialize({required int appId}) async {
+    if (_isInitialized) return;
+    if (appId == 0) {
+      throw StateError(
+        'ZEGO_APP_ID is not configured. '
+        'Build with --dart-define=ZEGO_APP_ID=<your app id>.',
       );
-
-      // Register event handlers
-      _registerEventHandlers();
-
-      // Configure audio settings
-      await _configureAudioSettings();
-
-      _isInitialized = true;
-      debugPrint('[ZegocloudService] SDK initialized successfully');
-    } catch (e) {
-      debugPrint('[ZegocloudService] Failed to initialize SDK: $e');
-      rethrow;
     }
+
+    await ZegoExpressEngine.createEngineWithProfile(
+      ZegoEngineProfile(appId, ZegoScenario.HighQualityChatroom),
+    );
+
+    _registerEventHandlers();
+
+    // Voice-chat friendly audio processing.
+    await ZegoExpressEngine.instance.enableAEC(true);
+    await ZegoExpressEngine.instance.enableANS(true);
+    await ZegoExpressEngine.instance.enableAGC(true);
+    await ZegoExpressEngine.instance.setAudioRouteToSpeaker(true);
+
+    _isInitialized = true;
+    debugPrint('[Zego] engine initialized (appId=$appId)');
   }
 
-  /// Join a voice room.
+  /// Log in to a voice room as a listener. Call [startPublishing] once the
+  /// user takes a seat.
   Future<void> joinRoom({
     required String roomId,
     required String userId,
     required String userName,
     required String token,
-    bool autoPublishAudio = true,
   }) async {
     if (!_isInitialized) {
-      throw StateError('ZEGOCLOUD SDK is not initialized. Call initialize() first.');
+      throw StateError('ZegocloudService.initialize() must be called first');
     }
-
     if (_isInRoom) {
-      debugPrint('[ZegocloudService] Already in room $_currentRoomId, leaving first...');
+      if (_currentRoomId == roomId) return;
       await leaveRoom();
     }
 
-    try {
-      _setRoomState(ZegoRoomState.connecting);
-      _currentRoomId = roomId;
-      _currentUserId = userId;
-      _pendingRoomToken = token;
-      _pendingUserName = userName;
-      _reconnectAttempts = 0;
+    _setState(VoiceConnectionState.connecting);
+    _currentRoomId = roomId;
+    _currentUserId = userId;
 
-      // Configure room config
-      final roomConfig = ZegoRoomConfig(
-        200, // Max users
-        true, // Enable user update
-        token,
-      );
+    final config = ZegoRoomConfig(0, true, token);
+    final result = await ZegoExpressEngine.instance.loginRoom(
+      roomId,
+      ZegoUser(userId, userName),
+      config: config,
+    );
 
-      // Login to room
-      await ZegoExpressEngine.instance.loginRoom(
-        roomId,
-        ZegoUser(userId, userName),
-        config: roomConfig,
-      );
-
-      // Start publishing local audio if auto-publish is enabled
-      if (autoPublishAudio) {
-        await _startLocalAudioStream(userId);
-      }
-
-      debugPrint('[ZegocloudService] Joined room: $roomId as user: $userId');
-    } catch (e) {
-      _setRoomState(ZegoRoomState.failed);
+    if (result.errorCode != 0) {
+      _setState(VoiceConnectionState.failed);
       _currentRoomId = null;
       _currentUserId = null;
-      debugPrint('[ZegocloudService] Failed to join room $roomId: $e');
-      rethrow;
+      throw StateError('ZEGO loginRoom failed: ${result.errorCode}');
     }
+
+    _isInRoom = true;
+    _setState(VoiceConnectionState.connected);
+
+    // Report sound levels ~3x/sec for speaking indicators.
+    await ZegoExpressEngine.instance.startSoundLevelMonitor(
+      config: ZegoSoundLevelConfig(300, false),
+    );
+
+    debugPrint('[Zego] joined room=$roomId user=$userId');
   }
 
-  /// Leave the current voice room.
+  /// Leave the room and stop all audio.
   Future<void> leaveRoom() async {
-    if (!_isInitialized || !_isInRoom) {
-      debugPrint('[ZegocloudService] Not in a room, nothing to leave');
-      return;
-    }
+    if (!_isInitialized) return;
+    final roomId = _currentRoomId;
 
     try {
-      _cancelReconnectTimer();
-
-      // Stop publishing audio
-      await ZegoExpressEngine.instance.stopPublishingStream();
-
-      // Logout from room
-      await ZegoExpressEngine.instance.logoutRoom(_currentRoomId!);
-
+      if (_isPublishing) {
+        await ZegoExpressEngine.instance.stopPublishingStream();
+      }
+      for (final streamId in _playingStreams.keys) {
+        await ZegoExpressEngine.instance.stopPlayingStream(streamId);
+      }
+      await ZegoExpressEngine.instance.stopSoundLevelMonitor();
+      if (roomId != null) {
+        await ZegoExpressEngine.instance.logoutRoom(roomId);
+      }
+    } catch (e) {
+      debugPrint('[Zego] error leaving room: $e');
+    } finally {
+      _playingStreams.clear();
+      _isPublishing = false;
       _isInRoom = false;
-      _isLocalAudioMuted = false;
-      final roomId = _currentRoomId;
+      _isMicMuted = false;
       _currentRoomId = null;
       _currentUserId = null;
-      _reconnectAttempts = 0;
-
-      _setRoomState(ZegoRoomState.disconnected);
-      debugPrint('[ZegocloudService] Left room: $roomId');
-    } catch (e) {
-      debugPrint('[ZegocloudService] Error leaving room: $e');
-      // Force state reset even on error
-      _isInRoom = false;
-      _currentRoomId = null;
-      _currentUserId = null;
-      _setRoomState(ZegoRoomState.disconnected);
+      _setState(VoiceConnectionState.disconnected);
+      debugPrint('[Zego] left room=$roomId');
     }
   }
 
-  /// Mute the local microphone.
-  Future<void> muteLocalAudio() async {
-    if (!_isInitialized || !_isInRoom) {
-      debugPrint('[ZegocloudService] Cannot mute: not in a room');
-      return;
-    }
+  /// Start publishing the local microphone (user took a seat).
+  Future<void> startPublishing() async {
+    if (!_isInRoom || _currentUserId == null) return;
+    if (_isPublishing) return;
 
-    try {
-      await ZegoExpressEngine.instance.muteMicrophone(true);
-      _isLocalAudioMuted = true;
-      debugPrint('[ZegocloudService] Local audio muted');
-      onMicrophoneStateChanged?.call(_currentUserId ?? '', true);
-    } catch (e) {
-      debugPrint('[ZegocloudService] Failed to mute audio: $e');
-      rethrow;
-    }
+    final streamId = _streamIdFor(_currentUserId!);
+    await ZegoExpressEngine.instance.muteMicrophone(false);
+    await ZegoExpressEngine.instance.startPublishingStream(streamId);
+    _isPublishing = true;
+    _isMicMuted = false;
+    debugPrint('[Zego] publishing stream=$streamId');
   }
 
-  /// Unmute the local microphone.
-  Future<void> unmuteLocalAudio() async {
-    if (!_isInitialized || !_isInRoom) {
-      debugPrint('[ZegocloudService] Cannot unmute: not in a room');
-      return;
-    }
-
-    try {
-      await ZegoExpressEngine.instance.muteMicrophone(false);
-      _isLocalAudioMuted = false;
-      debugPrint('[ZegocloudService] Local audio unmuted');
-      onMicrophoneStateChanged?.call(_currentUserId ?? '', false);
-    } catch (e) {
-      debugPrint('[ZegocloudService] Failed to unmute audio: $e');
-      rethrow;
-    }
+  /// Stop publishing (user left the seat). The user keeps hearing the room.
+  Future<void> stopPublishing() async {
+    if (!_isPublishing) return;
+    await ZegoExpressEngine.instance.stopPublishingStream();
+    _isPublishing = false;
+    debugPrint('[Zego] stopped publishing');
   }
 
-  /// Toggle the local microphone mute state.
-  Future<bool> toggleLocalAudio() async {
-    if (_isLocalAudioMuted) {
-      await unmuteLocalAudio();
-    } else {
-      await muteLocalAudio();
-    }
-    return _isLocalAudioMuted;
+  /// Mute/unmute the local microphone while staying on the seat.
+  Future<void> setMicrophoneMuted(bool muted) async {
+    await ZegoExpressEngine.instance.muteMicrophone(muted);
+    _isMicMuted = muted;
+    debugPrint('[Zego] mic ${muted ? 'muted' : 'unmuted'}');
   }
 
-  /// Enable or disable the speaker (vs. earpiece).
+  /// Route audio to loudspeaker (true) or earpiece (false).
   Future<void> setSpeakerEnabled(bool enabled) async {
     await ZegoExpressEngine.instance.setAudioRouteToSpeaker(enabled);
-    debugPrint('[ZegocloudService] Speaker ${enabled ? 'enabled' : 'disabled'}');
   }
 
-  /// Destroy the SDK engine. Call when the app is disposed.
+  /// Renew the room token before it expires (see [onTokenWillExpire]).
+  Future<void> renewToken(String token) async {
+    final roomId = _currentRoomId;
+    if (roomId == null) return;
+    await ZegoExpressEngine.instance.renewToken(roomId, token);
+    debugPrint('[Zego] token renewed for room=$roomId');
+  }
+
+  /// Tear down the engine entirely (app shutdown).
   Future<void> dispose() async {
     if (!_isInitialized) return;
+    await leaveRoom();
 
-    _cancelReconnectTimer();
-
-    if (_isInRoom) {
-      await leaveRoom();
-    }
-
-    // Unregister all event handlers
     ZegoExpressEngine.onRoomStateUpdate = null;
+    ZegoExpressEngine.onRoomStreamUpdate = null;
     ZegoExpressEngine.onRoomUserUpdate = null;
-    ZegoExpressEngine.onNetworkQuality = null;
-    ZegoExpressEngine.onRemoteMicStateUpdate = null;
+    ZegoExpressEngine.onRoomTokenWillExpire = null;
+    ZegoExpressEngine.onCapturedSoundLevelUpdate = null;
+    ZegoExpressEngine.onRemoteSoundLevelUpdate = null;
 
     await ZegoExpressEngine.destroyEngine();
-
     _isInitialized = false;
-    onRoomStateChanged = null;
-    onUserJoined = null;
-    onUserLeft = null;
-    onNetworkQualityChanged = null;
-    onMicrophoneStateChanged = null;
-
-    debugPrint('[ZegocloudService] SDK disposed');
+    onStateChanged = null;
+    onUsersJoined = null;
+    onUsersLeft = null;
+    onSpeakingLevels = null;
+    onTokenWillExpire = null;
+    debugPrint('[Zego] engine destroyed');
   }
 
-  // ==================== PRIVATE METHODS ====================
+  // ==================== internals ====================
 
-  /// Start publishing local audio stream.
-  Future<void> _startLocalAudioStream(String userId) async {
-    final streamId = '${userId}_audio_${_currentRoomId}';
-    await ZegoExpressEngine.instance.startPublishingStream(streamId);
-    debugPrint('[ZegocloudService] Started publishing audio stream: $streamId');
-  }
+  String _streamIdFor(String userId) => '${userId}_audio';
 
-  /// Configure audio session settings.
-  Future<void> _configureAudioSettings() async {
-    // Set audio session to default to speaker
-    await ZegoExpressEngine.instance.setAudioRouteToSpeaker(true);
+  String _userIdFromStreamId(String streamId) =>
+      streamId.endsWith('_audio')
+          ? streamId.substring(0, streamId.length - '_audio'.length)
+          : streamId;
 
-    // Set noise suppression, echo cancellation, AGC
-    await ZegoExpressEngine.instance.enableAECMode(ZegoAECMode.AI);
-    await ZegoExpressEngine.instance.enableANS(true);
-    await ZegoExpressEngine.instance.enableAGC(true);
-
-    debugPrint('[ZegocloudService] Audio settings configured');
-  }
-
-  /// Register ZEGOCLOUD event handlers.
   void _registerEventHandlers() {
-    // Room state changes
-    ZegoExpressEngine.onRoomStateUpdate = (
-      String roomId,
-      ZegoRoomState state,
-      int errorCode,
-      Map<String, dynamic> extendedData,
-    ) {
-      debugPrint(
-        '[ZegocloudService] Room state changed: roomId=$roomId state=$state errorCode=$errorCode',
-      );
-      _handleRoomStateUpdate(roomId, state, errorCode);
+    ZegoExpressEngine.onRoomStateUpdate =
+        (String roomId, ZegoRoomState state, int errorCode, Map extendedData) {
+      debugPrint('[Zego] room state=$state error=$errorCode room=$roomId');
+      switch (state) {
+        case ZegoRoomState.Connected:
+          _isInRoom = true;
+          _setState(VoiceConnectionState.connected);
+          break;
+        case ZegoRoomState.Connecting:
+          // The SDK reconnects automatically after temporary drops.
+          _setState(VoiceConnectionState.connecting);
+          break;
+        case ZegoRoomState.Disconnected:
+          _isInRoom = false;
+          _setState(errorCode != 0
+              ? VoiceConnectionState.failed
+              : VoiceConnectionState.disconnected);
+          break;
+      }
     };
 
-    // User join/leave events
+    // A remote user started/stopped publishing audio: play/stop their stream.
+    ZegoExpressEngine.onRoomStreamUpdate = (
+      String roomId,
+      ZegoUpdateType updateType,
+      List<ZegoStream> streamList,
+      Map<String, dynamic> extendedData,
+    ) async {
+      for (final stream in streamList) {
+        if (updateType == ZegoUpdateType.Add) {
+          _playingStreams[stream.streamID] = stream.user.userID;
+          await ZegoExpressEngine.instance.startPlayingStream(stream.streamID);
+          debugPrint('[Zego] playing remote stream=${stream.streamID}');
+        } else {
+          _playingStreams.remove(stream.streamID);
+          await ZegoExpressEngine.instance.stopPlayingStream(stream.streamID);
+          debugPrint('[Zego] stopped remote stream=${stream.streamID}');
+        }
+      }
+    };
+
     ZegoExpressEngine.onRoomUserUpdate = (
       String roomId,
       ZegoUpdateType updateType,
       List<ZegoUser> userList,
     ) {
+      final ids = userList.map((u) => u.userID).toList();
       if (updateType == ZegoUpdateType.Add) {
-        debugPrint('[ZegocloudService] Users joined room $roomId: ${userList.map((u) => u.userID).toList()}');
-        onUserJoined?.call(userList);
+        onUsersJoined?.call(ids);
       } else {
-        debugPrint('[ZegocloudService] Users left room $roomId: ${userList.map((u) => u.userID).toList()}');
-        onUserLeft?.call(userList);
+        onUsersLeft?.call(ids);
       }
     };
 
-    // Network quality updates
-    ZegoExpressEngine.onNetworkQuality = (
-      String userId,
-      ZegoStreamQualityLevel upstreamQuality,
-      ZegoStreamQualityLevel downstreamQuality,
-    ) {
-      onNetworkQualityChanged?.call(
-        upstreamQuality.index,
-        downstreamQuality.index,
-      );
+    ZegoExpressEngine.onRoomTokenWillExpire =
+        (String roomId, int remainTimeInSecond) {
+      debugPrint('[Zego] token expires in ${remainTimeInSecond}s');
+      onTokenWillExpire?.call(roomId);
     };
 
-    // Remote microphone state changes
-    ZegoExpressEngine.onRemoteMicStateUpdate = (
-      String streamId,
-      ZegoRemoteDeviceState state,
-    ) {
-      final isMuted = state == ZegoRemoteDeviceState.Mute;
-      // Extract userId from streamId (format: userId_audio_roomId)
-      final userId = streamId.split('_audio_').first;
-      debugPrint('[ZegocloudService] Remote mic state: userId=$userId muted=$isMuted');
-      onMicrophoneStateChanged?.call(userId, isMuted);
-    };
-  }
-
-  /// Handle room state update and trigger reconnection if needed.
-  void _handleRoomStateUpdate(String roomId, ZegoRoomState sdkState, int errorCode) {
-    switch (sdkState) {
-      case ZegoRoomState.Connected:
-        _isInRoom = true;
-        _reconnectAttempts = 0;
-        _cancelReconnectTimer();
-        _setRoomState(ZegoRoomState.connected);
-        break;
-
-      case ZegoRoomState.Connecting:
-        _setRoomState(ZegoRoomState.connecting);
-        break;
-
-      case ZegoRoomState.Disconnected:
-        if (_isInRoom && errorCode != 0) {
-          // Unexpected disconnect - attempt reconnection
-          _isInRoom = false;
-          _setRoomState(ZegoRoomState.reconnecting);
-          _scheduleReconnect();
-        } else {
-          _isInRoom = false;
-          _setRoomState(ZegoRoomState.disconnected);
-        }
-        break;
-
-      default:
-        break;
-    }
-  }
-
-  /// Schedule a reconnection attempt with exponential backoff.
-  void _scheduleReconnect() {
-    if (_reconnectAttempts >= _maxReconnectAttempts) {
-      debugPrint('[ZegocloudService] Max reconnect attempts reached. Giving up.');
-      _setRoomState(ZegoRoomState.failed);
-      return;
-    }
-
-    if (_currentRoomId == null || _currentUserId == null || _pendingRoomToken == null) {
-      debugPrint('[ZegocloudService] Missing room info for reconnection');
-      _setRoomState(ZegoRoomState.failed);
-      return;
-    }
-
-    final delay = Duration(seconds: (1 << _reconnectAttempts).clamp(1, 30));
-    _reconnectAttempts++;
-
-    debugPrint(
-      '[ZegocloudService] Scheduling reconnect attempt $_reconnectAttempts in ${delay.inSeconds}s',
-    );
-
-    _reconnectTimer = Timer(delay, () async {
-      if (_roomState != ZegoRoomState.reconnecting) return;
-
-      try {
-        debugPrint('[ZegocloudService] Attempting reconnection #$_reconnectAttempts...');
-        await joinRoom(
-          roomId: _currentRoomId!,
-          userId: _currentUserId!,
-          userName: _pendingUserName ?? _currentUserId!,
-          token: _pendingRoomToken!,
-        );
-      } catch (e) {
-        debugPrint('[ZegocloudService] Reconnection attempt #$_reconnectAttempts failed: $e');
-        _setRoomState(ZegoRoomState.reconnecting);
-        _scheduleReconnect();
+    ZegoExpressEngine.onCapturedSoundLevelUpdate = (double level) {
+      final me = _currentUserId;
+      if (me != null && _isPublishing && !_isMicMuted) {
+        onSpeakingLevels?.call({me: level});
       }
-    });
+    };
+
+    ZegoExpressEngine.onRemoteSoundLevelUpdate =
+        (Map<String, double> soundLevels) {
+      if (soundLevels.isEmpty) return;
+      final byUser = <String, double>{};
+      soundLevels.forEach((streamId, level) {
+        final userId = _playingStreams[streamId] ?? _userIdFromStreamId(streamId);
+        byUser[userId] = level;
+      });
+      onSpeakingLevels?.call(byUser);
+    };
   }
 
-  /// Cancel any pending reconnect timer.
-  void _cancelReconnectTimer() {
-    _reconnectTimer?.cancel();
-    _reconnectTimer = null;
-  }
-
-  /// Update room state and notify callbacks.
-  void _setRoomState(ZegoRoomState state) {
-    if (_roomState == state) return;
-    _roomState = state;
-    onRoomStateChanged?.call(state);
-    debugPrint('[ZegocloudService] Room state: $state');
+  void _setState(VoiceConnectionState next) {
+    if (_state == next) return;
+    _state = next;
+    onStateChanged?.call(next);
   }
 }
