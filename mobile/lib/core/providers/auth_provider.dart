@@ -119,7 +119,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         },
       );
 
-      final data = response.data as Map<String, dynamic>;
+      final data = unwrapResponse(response.data);
       final accessToken = data['accessToken'] as String;
       final refreshToken = data['refreshToken'] as String;
       final userData = data['user'] as Map<String, dynamic>;
@@ -193,6 +193,121 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  Future<bool> loginWithFacebook(String accessToken) async {
+    try {
+      state = state.copyWith(status: AuthStatus.loading);
+      final response = await _apiClient.post(
+        ApiConstants.facebookLogin,
+        data: {'accessToken': accessToken},
+      );
+
+      await _handleAuthResponse(response.data as Map<String, dynamic>);
+      return true;
+    } catch (e) {
+      state = state.copyWith(
+        status: AuthStatus.error,
+        error: e.toString(),
+      );
+      return false;
+    }
+  }
+
+  /// Returns 'ok' when logged in, 'verify' when an email code is required,
+  /// or null on failure (see state.error).
+  Future<String?> registerWithEmail({
+    required String email,
+    required String password,
+    String? displayName,
+  }) async {
+    try {
+      state = state.copyWith(status: AuthStatus.loading);
+      final response = await _apiClient.post(
+        ApiConstants.emailRegister,
+        data: {
+          'email': email,
+          'password': password,
+          if (displayName != null && displayName.isNotEmpty)
+            'displayName': displayName,
+        },
+      );
+
+      final data = unwrapResponse(response.data);
+      if (data['requiresVerification'] == true) {
+        state = state.copyWith(status: AuthStatus.unauthenticated);
+        return 'verify';
+      }
+
+      await _handleAuthResponse(data);
+      return 'ok';
+    } catch (e) {
+      state = state.copyWith(
+        status: AuthStatus.error,
+        error: e.toString(),
+      );
+      return null;
+    }
+  }
+
+  /// Returns 'ok' when logged in, 'verify' when the email still needs a
+  /// verification code, or null on failure (see state.error).
+  Future<String?> loginWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      state = state.copyWith(status: AuthStatus.loading);
+      final response = await _apiClient.post(
+        ApiConstants.emailLogin,
+        data: {'email': email, 'password': password},
+      );
+
+      await _handleAuthResponse(response.data as Map<String, dynamic>);
+      return 'ok';
+    } catch (e) {
+      final message = e.toString();
+      if (message.contains('not verified')) {
+        state = state.copyWith(status: AuthStatus.unauthenticated);
+        return 'verify';
+      }
+      state = state.copyWith(
+        status: AuthStatus.error,
+        error: message,
+      );
+      return null;
+    }
+  }
+
+  Future<bool> verifyEmail({
+    required String email,
+    required String code,
+  }) async {
+    try {
+      state = state.copyWith(status: AuthStatus.loading);
+      final response = await _apiClient.post(
+        ApiConstants.emailVerify,
+        data: {'email': email, 'code': code},
+      );
+
+      await _handleAuthResponse(response.data as Map<String, dynamic>);
+      return true;
+    } catch (e) {
+      state = state.copyWith(
+        status: AuthStatus.error,
+        error: e.toString(),
+      );
+      return false;
+    }
+  }
+
+  Future<void> resendEmailCode(String email) async {
+    try {
+      await _apiClient.post(
+        ApiConstants.emailResend,
+        data: {'email': email},
+      );
+    } catch (_) {}
+  }
+
   Future<bool> loginAsGuest() async {
     try {
       state = state.copyWith(status: AuthStatus.loading);
@@ -209,7 +324,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> _handleAuthResponse(Map<String, dynamic> data) async {
+  /// Strip the backend's global `{ success, data }` response envelope.
+  static Map<String, dynamic> unwrapResponse(dynamic body) {
+    if (body is Map && body['data'] is Map) {
+      return Map<String, dynamic>.from(body['data'] as Map);
+    }
+    return Map<String, dynamic>.from(body as Map);
+  }
+
+  Future<void> _handleAuthResponse(Map<String, dynamic> raw) async {
+    final data = unwrapResponse(raw);
     final accessToken = data['accessToken'] as String;
     final refreshToken = data['refreshToken'] as String;
     final userData = data['user'] as Map<String, dynamic>;

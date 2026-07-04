@@ -352,8 +352,12 @@ model User {
   id            String    @id @default(cuid())
   phone         String?   @unique
   email         String?   @unique
+  emailVerified Boolean   @default(false)
+  passwordHash  String?
   googleId      String?   @unique
   appleId       String?   @unique
+  facebookId    String?   @unique
+  telegramId    String?   @unique
   username      String?   @unique
   displayName   String?
   avatar        String?

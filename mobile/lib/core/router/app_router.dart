@@ -5,6 +5,7 @@ import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/onboarding_screen.dart';
 import '../../features/auth/presentation/screens/phone_login_screen.dart';
 import '../../features/auth/presentation/screens/otp_screen.dart';
+import '../../features/auth/presentation/screens/email_login_screen.dart';
 import '../../features/auth/presentation/screens/profile_setup_screen.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
 import '../../features/home/presentation/screens/discover_screen.dart';
@@ -55,6 +56,7 @@ class AppRoutes {
   static const String splash = '/splash';
   static const String onboarding = '/onboarding';
   static const String phoneLogin = '/auth/phone';
+  static const String emailLogin = '/auth/email';
   static const String otp = '/auth/otp';
   static const String profileSetup = '/auth/profile-setup';
   static const String home = '/';
@@ -160,6 +162,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => _buildPage(
           state,
           const PhoneLoginScreen(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.emailLogin,
+        pageBuilder: (context, state) => _buildPage(
+          state,
+          const EmailLoginScreen(),
         ),
       ),
       GoRoute(

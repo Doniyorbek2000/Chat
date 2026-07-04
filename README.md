@@ -47,7 +47,7 @@ VOXO is a feature-rich, real-time voice chat and social platform built for enter
 | Reverse Proxy | NGINX                                              |
 | Containerization | Docker, Docker Compose                          |
 | CI/CD         | GitHub Actions                                     |
-| Auth          | JWT, Google OAuth, Apple Sign In                   |
+| Auth          | JWT, Email+Password, Google, Facebook, Telegram, Apple |
 | Payments      | Click, Payme, Uzum Bank                            |
 
 ## Prerequisites

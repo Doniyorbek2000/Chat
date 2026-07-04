@@ -63,6 +63,20 @@ export default () => ({
     eskizFrom: process.env.ESKIZ_FROM || '4546',
     eskizBaseUrl: process.env.ESKIZ_BASE_URL || 'https://notify.eskiz.uz/api',
   },
+  smtp: {
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT, 10) || 587,
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+    from: process.env.SMTP_FROM,
+  },
+  facebook: {
+    appId: process.env.FACEBOOK_APP_ID,
+    appSecret: process.env.FACEBOOK_APP_SECRET,
+  },
+  telegram: {
+    botToken: process.env.TELEGRAM_BOT_TOKEN,
+  },
   googlePlay: {
     packageName: process.env.GOOGLE_PLAY_PACKAGE_NAME || 'app.voxo.mobile',
     serviceAccountEmail: process.env.GOOGLE_PLAY_SA_EMAIL,
