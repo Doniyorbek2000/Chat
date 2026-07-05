@@ -12,6 +12,8 @@ import '../../../../core/network/socket_client.dart';
 import '../../../../core/providers/room_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../widgets/gift_panel.dart';
+import '../../../../shared/widgets/gift_animation_overlay.dart';
+import '../widgets/greedy_game_panel.dart';
 import '../widgets/pk_battle_widget.dart';
 import '../widgets/room_chat_panel.dart';
 import '../widgets/seat_widget.dart';
@@ -90,6 +92,15 @@ class _RoomScreenState extends ConsumerState<RoomScreen>
         receiverId: room?.host.id ?? '',
         onClose: () => Navigator.of(context).pop(),
       ),
+    );
+  }
+
+  void _openGamePanel() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const GreedyGamePanel(),
     );
   }
 
@@ -250,6 +261,17 @@ class _RoomScreenState extends ConsumerState<RoomScreen>
             right: 16,
             bottom: 180,
             child: _buildGiftStreamOverlay(activeGifts),
+          ),
+
+        // Full-screen SVGA/Lottie gift animation
+        if (activeGifts.isNotEmpty)
+          Positioned.fill(
+            child: GiftAnimationOverlay(
+              gifts: activeGifts,
+              onCompleted: (id) => ref
+                  .read(roomProvider.notifier)
+                  .removeGiftFromQueue(id),
+            ),
           ),
       ],
     );
@@ -618,6 +640,13 @@ class _RoomScreenState extends ConsumerState<RoomScreen>
             iconColor: AppColors.vip3,
             bgColor: AppColors.vip3.withOpacity(0.15),
             onTap: _openGiftPanel,
+          ),
+          _buildToolbarButton(
+            icon: Icons.casino_outlined,
+            label: 'Game',
+            iconColor: Colors.amber,
+            bgColor: Colors.amber.withOpacity(0.15),
+            onTap: _openGamePanel,
           ),
           _buildToolbarButton(
             icon: Icons.chat_bubble_outline,

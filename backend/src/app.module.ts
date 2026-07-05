@@ -49,6 +49,7 @@ import { RiskModule } from './modules/risk/risk.module';
 import { RoomModerationModule } from './modules/room-moderation/room-moderation.module';
 import { VerificationModule } from './modules/verification/verification.module';
 import { GrowthDashboardModule } from './modules/growth-dashboard/growth-dashboard.module';
+import { GreedyModule } from './modules/greedy/greedy.module';
 
 @Module({
   imports: [
@@ -127,6 +128,7 @@ import { GrowthDashboardModule } from './modules/growth-dashboard/growth-dashboa
     RoomModerationModule,
     VerificationModule,
     GrowthDashboardModule,
+    GreedyModule,
   ],
 })
 export class AppModule {}

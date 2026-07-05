@@ -424,6 +424,7 @@ model User {
   luckyEntries         LuckyGiftEntry[]
   luckyResults         LuckyGiftResult[]     @relation("LuckyResultWinner")
   jackpotWins          JackpotWinner[]
+  greedyBets           GreedyBet[]
   nobleSubscription    UserNobleSubscription?
   noblePurchases       NoblePurchase[]
   nobleSent            NobleGift[]           @relation("NobleSender")
@@ -2586,4 +2587,46 @@ model RoomVerificationBadge {
 
   @@unique([roomId, badgeId])
   @@map("room_verification_badges")
+}
+
+// ==================== GREEDY GAME ====================
+
+enum GreedyRoundStatus {
+  BETTING
+  SETTLED
+}
+
+model GreedyRound {
+  id          String            @id @default(cuid())
+  roundNumber Int               @unique @default(autoincrement())
+  status      GreedyRoundStatus @default(BETTING)
+  resultItem  String?
+  totalBet    BigInt            @default(0)
+  totalPayout BigInt            @default(0)
+  startedAt   DateTime          @default(now())
+  endsAt      DateTime
+  settledAt   DateTime?
+
+  bets GreedyBet[]
+
+  @@index([status])
+  @@index([settledAt])
+  @@map("greedy_rounds")
+}
+
+model GreedyBet {
+  id        String   @id @default(cuid())
+  roundId   String
+  userId    String
+  item      String
+  amount    BigInt
+  payout    BigInt   @default(0)
+  createdAt DateTime @default(now())
+
+  round GreedyRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  user  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([roundId])
+  @@index([userId, createdAt])
+  @@map("greedy_bets")
 }

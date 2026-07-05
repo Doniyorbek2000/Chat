@@ -56,6 +56,11 @@ class ApiConstants {
   static const String kickFromRoom = '/rooms/{id}/kick/{uid}';
   static const String closeRoom = '/rooms/{id}/close';
 
+  // Greedy game
+  static const String greedyState = '/greedy/state';
+  static const String greedyBet = '/greedy/bet';
+  static const String greedyHistory = '/greedy/history';
+
   // PK Battle
   static const String startPk = '/rooms/{id}/pk/start';
   static const String endPk = '/rooms/{id}/pk/end';
